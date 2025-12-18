@@ -1,8 +1,8 @@
-# Claude Code Rules
+# Claude Code Rules - Hackathon III: SP Constitution (Spec-Kit Plus)
 
-This file is generated during init for the selected agent.
+This file provides runtime operational guidance for Claude Code agent within the Hackathon III project. For governance principles, see `.specify/memory/constitution.md`.
 
-You are an expert AI assistant specializing in Spec-Driven Development (SDD). Your primary goal is to work with the architext to build products.
+You are an expert AI assistant specializing in CAPS-first development and Spec-Driven Development (SDD). Your primary goal is to build the LearnFlow application by executing CAPS playbooks and following the project constitution.
 
 ## Task context
 
@@ -207,4 +207,82 @@ Wait for consent; never auto-create ADRs. Group related decisions (stacks, authe
 - `.specify/` — SpecKit Plus templates and scripts
 
 ## Code Standards
-See `.specify/memory/constitution.md` for code quality, testing, performance, security, and architecture principles.
+
+See `.specify/memory/constitution.md` for complete governance principles. Key constitution requirements:
+
+### CAPS-First Development (Principle I)
+- All workflows MUST be authored as CAPS playbooks in `caps-library/playbooks/`
+- Playbooks MUST compile to both Claude Skills and Goose Recipes
+- Zero tolerance for ambiguity in playbook instructions
+- Every step must be AI-executable without human interpretation
+
+### Bi-Directional Validation (Principle II)
+- Generated Skills/Recipes MUST be tested with actual agents
+- CI/CD pipeline validates compilation on every commit
+- Compilation failures block merges to `main`
+
+### Phase-Gate Compliance (Principle III)
+**Current Phase**: Phase 1 - Setup
+- 8 phases: Setup → Foundation CAPS → Infrastructure CAPS → Backend → Frontend → Integration → LearnFlow Build → Polish
+- No phase skip without documented justification
+- Phase completion requires explicit sign-off
+- Checkpoint validations in `specs/<phase>/`
+
+### Kubernetes-Native Architecture (Principle IV)
+- Every service MUST have K8s manifests (Deployments, Services, ConfigMaps, Secrets)
+- Dapr sidecar patterns REQUIRED for inter-service communication
+- Local development on Minikube (4 CPU, 8GB RAM minimum)
+- Stateless services preferred; justify stateful components
+
+### MCP Integration (Principle V)
+- Implement MCP servers for key services (code-runner, API gateway)
+- MCP servers expose: state, logs, schema, health metrics
+- AGENTS.md file in every repository for AI consumption
+- 20% of hackathon evaluation score
+
+### Documentation Standards (Principle VI)
+- Documentation auto-generated from CAPS playbooks
+- Docusaurus site deployed via `docusaurus-deploy` playbook
+- Auto-deploy on push to `main` branch
+- 15% of hackathon evaluation score
+
+### Test-Driven Playbook Refinement (Principle VII)
+- First playbook invocation expected to fail
+- Document failure modes in `## Troubleshooting`
+- Target: <5% manual fixes to AI-generated code
+- Track playbook versions in git
+
+### Feature Parity (Principle VIII)
+- Build LearnFlow in two versions: learnflow-claude/ and learnflow-goose/
+- Identical business logic required
+- Document agent-specific workarounds in AGENTS.md
+- Divergences require ADR justification
+
+### Technology Stack (from Constitution)
+- **Backend**: Python 3.11+ with FastAPI
+- **Frontend**: Next.js 14+ with TypeScript, Monaco Editor
+- **Infrastructure**: Kubernetes 1.27+, Dapr 1.12+, Helm 3.12+
+- **Messaging**: Kafka (Strimzi Helm chart)
+- **Storage**: PostgreSQL 15+
+- **Deployment**: Minikube → Argo CD
+
+### Git Commit Pattern (from Constitution)
+```
+<agent>: <task> using <playbook/skill/recipe>
+
+Example:
+Claude: deployed Kafka using kafka-k8s-setup CAPS playbook
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+```
+
+### Review Checklist (from Constitution)
+Before any PR or phase completion:
+- [ ] CAPS playbook compiles to both Skills and Recipes
+- [ ] Kubernetes manifests valid and tested in Minikube
+- [ ] Dapr sidecars configured correctly
+- [ ] MCP integration provides useful context
+- [ ] Documentation auto-generated and deployed
+- [ ] Phase success criteria met
+- [ ] No unrelated code refactoring or feature creep

@@ -16,6 +16,6 @@ bash caps-library/scripts/caps-to-skills.sh hello-world --validate
 ---
 
 **Source Playbook:** `caps-library/playbooks/hello-world/playbook.md`
-**Compiled:** 2025-12-19 15:09:33 UTC
+**Compiled:** 2025-12-19 16:11:51 UTC
 **CAPS Version:** 1.0.0
 **Skill Name:** hello-world

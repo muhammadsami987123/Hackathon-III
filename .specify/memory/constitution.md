@@ -39,8 +39,11 @@ The **CAPS (Common Agent Playbook Specification)** format is the single source o
 - Each playbook MUST compile cleanly to both Claude Skills and Goose Recipes without manual intervention
 - Playbooks MUST include: title, description, version, allowed_tools, prerequisites, step-by-step instructions, validation criteria, and troubleshooting guidance
 - Zero tolerance for ambiguity: every step must be AI-executable without human interpretation
+- Claude Skills compiled to `.claude/skills/` directory
+- Goose Recipes compiled to `.goose/recipes/` directory
+- Skills/Recipes invoked via slash commands (e.g., `/sp.plan`, `/sp.tasks`)
 
-**Rationale**: CAPS ensures portability across AI agent platforms (Claude Code, Goose) and enables the paradigm shift from "write code" to "write playbooks → AI writes code." This is the foundation for reusable intelligence.
+**Rationale**: CAPS ensures portability across AI agent platforms (Claude Code, Goose) and enables the paradigm shift from "write code" to "write playbooks → AI writes code." This is the foundation for reusable intelligence. Claude CLI Skills provide a native mechanism for extending Claude Code with custom workflows.
 
 ---
 
@@ -163,10 +166,28 @@ caps-library/playbooks/<playbook-name>/
 └── examples/                # Example invocations
 ```
 
+**Claude CLI Skills Directory Structure**:
+```
+.claude/
+├── commands/                # Slash command definitions
+│   ├── sp.plan.md          # /sp.plan command
+│   ├── sp.tasks.md         # /sp.tasks command
+│   └── ...
+├── skills/                  # Compiled Skills from CAPS
+│   ├── <skill-name>/
+│   │   └── skill.md        # Skill definition
+│   └── ...
+└── settings.local.json      # Claude configuration
+```
+
 **LearnFlow Application Structure**:
 ```
 learnflow-{agent}/
-├── .claude/skills/ or recipes/  # Generated from CAPS
+├── .claude/                 # Claude Skills (for learnflow-claude)
+│   ├── commands/           # Slash commands
+│   └── skills/             # Compiled Skills
+├── .goose/                  # Goose Recipes (for learnflow-goose)
+│   └── recipes/            # Compiled Recipes
 ├── src/
 │   ├── frontend/            # Next.js + Monaco
 │   ├── services/            # FastAPI + Dapr agents
@@ -286,7 +307,9 @@ This constitution supersedes all other development practices for the SP Constitu
 - Document any complexity added with explicit justification in Complexity Tracking table
 
 **Review checklist for all changes**:
-- [ ] CAPS playbook compiles to both Skills and Recipes
+- [ ] CAPS playbook compiles to both Skills (`.claude/skills/`) and Recipes (`.goose/recipes/`)
+- [ ] Generated Skills/Recipes are syntactically valid and tested with actual agents
+- [ ] Slash commands properly registered in `.claude/commands/` or `.goose/commands/`
 - [ ] Kubernetes manifests valid and tested in Minikube
 - [ ] Dapr sidecars configured correctly for service communication
 - [ ] MCP integration provides useful context for AI agents

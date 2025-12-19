@@ -4,6 +4,55 @@ This file provides runtime operational guidance for Claude Code agent within the
 
 You are an expert AI assistant specializing in CAPS-first development and Spec-Driven Development (SDD). Your primary goal is to build the LearnFlow application by executing CAPS playbooks and following the project constitution.
 
+## Claude CLI Skills Integration
+
+**CRITICAL**: This project uses Claude CLI Skills extensively. Skills are custom slash commands that extend Claude's capabilities.
+
+### Skills Directory Structure
+```
+.claude/
+├── commands/           # Slash commands (e.g., /sp.tasks, /sp.plan)
+└── skills/            # Reusable Skills compiled from CAPS playbooks
+    └── <skill-name>/
+        └── skill.md   # Skill definition
+```
+
+### Using Skills
+- Skills are invoked via slash commands: `/sp.specify`, `/sp.plan`, `/sp.tasks`, etc.
+- Each skill is compiled from a CAPS playbook in `caps-library/playbooks/`
+- Skills MUST be validated before use by running them in a test context
+- When a user references a slash command, check `.claude/commands/` first
+
+### Skill Creation Workflow
+1. Author CAPS playbook in `caps-library/playbooks/<name>/playbook.md`
+2. Compile to Claude Skill: `bash caps-library/scripts/caps-to-skills.sh <playbook-name>`
+3. Output placed in `.claude/skills/<name>/skill.md`
+4. Test the skill by invoking: `/<skill-name>`
+5. Refine playbook based on execution results
+
+### Available Skills (Auto-discovered from .claude/commands/)
+Run `ls .claude/commands/` to see all available slash commands. Common skills include:
+- `/sp.specify` - Create/update feature specification
+- `/sp.plan` - Execute implementation planning workflow
+- `/sp.tasks` - Generate actionable tasks.md
+- `/sp.taskstoissues` - Convert tasks to GitHub issues
+- `/sp.implement` - Execute implementation plan
+- `/sp.phr` - Record Prompt History Record
+- `/sp.adr` - Create Architecture Decision Record
+- `/sp.constitution` - Create/update project constitution
+- `/sp.clarify` - Ask clarification questions
+- `/sp.analyze` - Cross-artifact consistency analysis
+- `/sp.checklist` - Generate custom feature checklist
+- `/sp.reverse-engineer` - Reverse engineer codebase to SDD artifacts
+- `/sp.git.commit_pr` - Autonomous git commit and PR creation
+
+### Skills Best Practices
+1. **Always check availability first**: Use `ls .claude/commands/` before assuming a skill exists
+2. **Prefer Skills over manual workflows**: If a slash command exists for a task, use it
+3. **Test after compilation**: After compiling CAPS to Skills, test with actual invocation
+4. **Document failures**: When a skill fails, document in playbook's Troubleshooting section
+5. **Version tracking**: Track skill versions in git commits per constitution requirements
+
 ## Task context
 
 **Your Surface:** You operate on a project level, providing guidance to users and executing development tasks via a defined set of tools.
@@ -30,6 +79,14 @@ Agents MUST prioritize and use MCP tools and CLI commands for all information ga
 
 ### 2. Execution Flow:
 Treat MCP servers as first-class tools for discovery, verification, execution, and state capture. PREFER CLI interactions (running commands and capturing outputs) over manual file creation or reliance on internal knowledge.
+
+**Execution Priority Order**:
+1. **First**: Check if a Claude Skill (slash command) exists in `.claude/commands/` for the task
+2. **Second**: Use MCP tools if available and relevant
+3. **Third**: Use CLI commands (bash, git, kubectl, etc.)
+4. **Last**: Manual file operations (only when no automated option exists)
+
+Example: For creating a feature spec, use `/sp.specify` rather than manually creating spec.md
 
 ### 3. Knowledge capture (PHR) for Every User Input.
 After completing requests, you **MUST** create a PHR (Prompt History Record).
@@ -76,11 +133,13 @@ After completing requests, you **MUST** create a PHR (Prompt History Record).
    - Write the completed file with agent file tools (WriteFile/Edit).
    - Confirm absolute path in output.
 
-4) Use sp.phr command file if present
-   - If `.**/commands/sp.phr.*` exists, follow its structure.
-   - If it references shell but Shell is unavailable, still perform step 3 with agent‑native tools.
+4) Use /sp.phr slash command if available
+   - Check if `.claude/commands/sp.phr.md` exists
+   - If available, invoke: `/sp.phr` (the command will handle PHR creation automatically)
+   - The slash command uses the Skills framework for consistent PHR creation
+   - If command is not available or fails, fall back to step 3 (agent-native flow)
 
-5) Shell fallback (only if step 3 is unavailable or fails, and Shell is permitted)
+5) Shell fallback (only if steps 3-4 are unavailable or fail, and Shell is permitted)
    - Run: `.specify/scripts/bash/create-phr.sh --title "<title>" --stage <stage> [--feature <name>] --json`
    - Then open/patch the created file to ensure all placeholders are filled and prompt/response are embedded.
 
@@ -125,11 +184,12 @@ You are not expected to solve every problem autonomously. You MUST invoke the us
 
 ### Execution contract for every request
 1) Confirm surface and success criteria (one sentence).
-2) List constraints, invariants, non‑goals.
-3) Produce the artifact with acceptance checks inlined (checkboxes or tests where applicable).
-4) Add follow‑ups and risks (max 3 bullets).
-5) Create PHR in appropriate subdirectory under `history/prompts/` (constitution, feature-name, or general).
-6) If plan/tasks identified decisions that meet significance, surface ADR suggestion text as described above.
+2) Check if relevant Skills/slash commands are available in `.claude/commands/` for this request type.
+3) List constraints, invariants, non‑goals.
+4) Produce the artifact with acceptance checks inlined (checkboxes or tests where applicable).
+5) Add follow‑ups and risks (max 3 bullets).
+6) Create PHR in appropriate subdirectory under `history/prompts/` (constitution, feature-name, or general) using `/sp.phr` if available.
+7) If plan/tasks identified decisions that meet significance, surface ADR suggestion text as described above.
 
 ### Minimum acceptance criteria
 - Clear, testable acceptance criteria included

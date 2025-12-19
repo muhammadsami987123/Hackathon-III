@@ -1,286 +1,458 @@
-# [Playbook Title]
+---
+# YAML Frontmatter - Required for CAPS compilation
+# See: caps-library/docs/best-practices.md for detailed field descriptions
 
-**CAPS Playbook Template**
-Version: 1.0.0
+title: Your Playbook Title Here
+# REQUIRED: Human-readable playbook name (3-80 characters)
+# Example: "Kafka Kubernetes Setup"
 
-## Description
+description: One-sentence summary of what this playbook accomplishes
+# REQUIRED: Brief description (10-300 characters)
+# Example: "Deploy Apache Kafka on Kubernetes using Helm with topic creation and testing"
 
-[Brief description of what this playbook does - 1-2 sentences]
+version: 1.0.0
+# REQUIRED: Semantic version (MAJOR.MINOR.PATCH)
+# - MAJOR: Breaking changes (incompatible with previous version)
+# - MINOR: New features/steps (backwards compatible)
+# - PATCH: Clarifications/fixes (no functional changes)
 
-## Metadata
+category: infrastructure
+# RECOMMENDED: Playbook domain
+# Options: infrastructure, backend, frontend, tools, deployment, integration, testing, database, documentation
 
-- **Version:** 1.0.0
-- **Author:** [Agent/Team Name]
-- **Created:** [YYYY-MM-DD]
-- **Last Updated:** [YYYY-MM-DD]
-- **Category:** [infrastructure/deployment/development/testing/other]
-- **Allowed Tools:** [bash, kubectl, docker, npm, etc.]
+tags:
+  - kubernetes
+  - helm
+  - example
+# RECOMMENDED: Searchable keywords (3-8 tags, lowercase-hyphenated)
+# Use tags that users would search for
+
+difficulty: intermediate
+# RECOMMENDED: Complexity level
+# Options: beginner, intermediate, advanced, expert
+
+estimated_time: 20
+# RECOMMENDED: Minutes to complete (wall-clock time including waits)
+# Be realistic - include time for pods to start, downloads, etc.
+
+allowed_tools:
+  - bash
+  - kubectl
+  - helm
+# REQUIRED: Array of tools used in playbook
+# Common tools: bash, kubectl, helm, docker, git, python, npm, curl, jq, yq, terraform, ansible
+# Validation will warn for unknown tools (but still compile)
+
+prerequisites:
+  - kubernetes_cluster_running
+  - kubectl_configured
+  - helm_installed
+# REQUIRED: Array of testable conditions (snake_case format)
+# Each prerequisite should be verifiable with a command
+# Example: kubernetes_cluster_running → verified by `kubectl cluster-info`
+
+dependencies:
+  - namespace-setup
+# OPTIONAL: Other playbook names that should run first (direct dependencies only)
+# Use playbook directory names, not paths
+
+skip_conditions:
+  - resource_already_deployed
+# OPTIONAL: Conditions where this playbook can be skipped
+# Should be testable via bash/kubectl commands
+---
+
+# Your Playbook Title Here
+
+<!-- Brief introduction paragraph expanding on the description -->
+This playbook guides you through [detailed explanation of what the playbook does and why]. By the end, you will have [expected outcome].
 
 ## Prerequisites
 
-List all prerequisites that must be satisfied before executing this playbook:
+<!-- Human-readable prerequisites with verification commands -->
+Before starting this playbook, ensure the following prerequisites are met:
 
-- [ ] Prerequisite 1 (e.g., Minikube running)
-- [ ] Prerequisite 2 (e.g., kubectl configured)
-- [ ] Prerequisite 3 (e.g., Required environment variables set)
-- [ ] Prerequisite 4 (e.g., Specific packages installed)
+**Required Software:**
+```bash
+# Check Kubernetes cluster
+kubectl cluster-info
+# Expected: Kubernetes control plane is running at https://...
 
-### Required Environment
+# Check kubectl version
+kubectl version --client --output=yaml | grep gitVersion
+# Expected: v1.27.0 or later
 
-- **Operating System:** [Linux/macOS/Windows/Any]
-- **Required Software:**
-  - Tool 1 (version X.Y.Z+)
-  - Tool 2 (version X.Y.Z+)
-- **Required Permissions:** [sudo/admin/regular user]
+# Check Helm installed
+helm version --short
+# Expected: v3.12.0 or later
+```
 
-### Required Files/Directories
+**Required Permissions:**
+- Cluster admin access (for namespace creation)
+- Ability to install Helm charts
 
-- `/path/to/required/file`
-- `/path/to/required/directory/`
+**Required Environment Variables:**
+```bash
+# Check environment variables (if any)
+echo $KUBECONFIG
+# Should point to valid kubeconfig file
+```
 
-## Steps
+**Resource Requirements:**
+- Kubernetes cluster with 4+ CPUs and 8GB+ RAM
+- Available storage: 10GB for persistent volumes
 
-### Step 1: [Action Name]
+## Instructions
 
-**Objective:** [What this step accomplishes]
+<!-- Sequential execution steps with bash commands -->
+<!-- Each step must have: Objective, Commands, Expected Output, Success Criteria -->
+
+### Step 1: Create Namespace
+
+**Objective:** Create an isolated Kubernetes namespace for the deployment
 
 **Commands:**
 ```bash
-# Command 1 with explanation
-command --flag value
+# Create namespace
+kubectl create namespace my-app
 
-# Command 2 with explanation
-another-command
+# Verify namespace creation
+kubectl get namespace my-app
 ```
 
 **Expected Output:**
 ```
-Sample expected output here
+namespace/my-app created
+
+NAME     STATUS   AGE
+my-app   Active   1s
 ```
 
 **Success Criteria:**
-- [ ] Criterion 1
-- [ ] Criterion 2
+- [ ] Namespace `my-app` exists in cluster
+- [ ] Namespace status is `Active`
+- [ ] No errors in kubectl output
 
 ---
 
-### Step 2: [Action Name]
+### Step 2: Add Helm Repository
 
-**Objective:** [What this step accomplishes]
+**Objective:** Add the Helm chart repository to local Helm configuration
 
 **Commands:**
 ```bash
-# Commands for step 2
+# Add Helm repository
+helm repo add my-repo https://charts.example.com
+
+# Update repository index
+helm repo update
+
+# Verify repository added
+helm repo list
 ```
 
 **Expected Output:**
 ```
-Expected output
+"my-repo" has been added to your repositories
+
+Hang tight while we grab the latest from your chart repositories...
+...Successfully got an update from the "my-repo" chart repository
+
+NAME       URL
+my-repo    https://charts.example.com
 ```
 
 **Success Criteria:**
-- [ ] Criterion 1
-- [ ] Criterion 2
+- [ ] Repository `my-repo` added successfully
+- [ ] Repository index updated without errors
+- [ ] Repository appears in `helm repo list`
 
 ---
 
-### Step 3: [Action Name]
+### Step 3: Install Helm Chart
 
-**Objective:** [What this step accomplishes]
+**Objective:** Deploy the application using Helm chart with custom values
 
 **Commands:**
 ```bash
-# Commands for step 3
+# Install Helm chart
+helm install my-release my-repo/my-chart \
+  --namespace my-app \
+  --set replicas=3 \
+  --set image.tag=v1.0.0 \
+  --wait --timeout=5m
+
+# Verify installation
+helm list -n my-app
 ```
 
 **Expected Output:**
 ```
-Expected output
+NAME: my-release
+LAST DEPLOYED: Thu Dec 19 19:00:00 2025
+NAMESPACE: my-app
+STATUS: deployed
+REVISION: 1
+
+NAME         NAMESPACE  REVISION  UPDATED                                  STATUS    CHART          APP VERSION
+my-release   my-app     1         2025-12-19 19:00:00.000000000 +0000 UTC  deployed  my-chart-1.0.0 1.0.0
 ```
 
 **Success Criteria:**
-- [ ] Criterion 1
-- [ ] Criterion 2
+- [ ] Helm release `my-release` created successfully
+- [ ] Release status is `deployed`
+- [ ] All pods reach `Running` state (within 5 minutes)
 
 ---
 
-[Add more steps as needed...]
+### Step 4: Verify Deployment
+
+**Objective:** Confirm that all resources are running and healthy
+
+**Commands:**
+```bash
+# Check pod status
+kubectl get pods -n my-app
+
+# Check deployment status
+kubectl get deployment -n my-app
+
+# Check service
+kubectl get svc -n my-app
+```
+
+**Expected Output:**
+```
+NAME                          READY   STATUS    RESTARTS   AGE
+my-release-abc123-xyz         1/1     Running   0          2m
+
+NAME         READY   UP-TO-DATE   AVAILABLE   AGE
+my-release   3/3     3            3           2m
+
+NAME         TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
+my-release   ClusterIP   10.96.100.50   <none>        8080/TCP   2m
+```
+
+**Success Criteria:**
+- [ ] All pods show `Running` status
+- [ ] Deployment shows all replicas ready (3/3)
+- [ ] Service has ClusterIP assigned
+- [ ] No pods in `CrashLoopBackOff` or `Error` state
+
+---
+
+<!-- Add more steps as needed (Step 5, Step 6, etc.) -->
+<!-- Maintain consecutive numbering (Step 1, Step 2, Step 3, ...) -->
 
 ## Validation
 
-### Automated Validation
+<!-- Success criteria as testable checklist items -->
+Success criteria (all must pass):
 
-Run these commands to verify successful execution:
+- [ ] **Namespace Exists:** `kubectl get namespace my-app` returns Active status
+- [ ] **Helm Release Deployed:** `helm list -n my-app` shows release with `deployed` status
+- [ ] **Pods Running:** `kubectl get pods -n my-app` shows all pods in `Running` state
+- [ ] **Service Accessible:** `kubectl get svc my-app -n my-app` shows CLUSTER-IP assigned
+- [ ] **Endpoints Ready:** `kubectl get endpoints -n my-app` shows ready endpoints
 
+**Quick Validation Script:**
 ```bash
-# Validation command 1
-validation-command-1
-
-# Validation command 2
-validation-command-2
+# Run all validation checks
+kubectl get namespace my-app && \
+  helm list -n my-app | grep -q "deployed" && \
+  kubectl get pods -n my-app | grep -q "Running" && \
+  kubectl get svc -n my-app | grep -q "ClusterIP" && \
+  echo "✅ All validation checks passed!" || \
+  echo "❌ Some validation checks failed"
 ```
-
-### Manual Verification Checklist
-
-- [ ] Verification item 1
-- [ ] Verification item 2
-- [ ] Verification item 3
-
-### Success Indicators
-
-List observable indicators that the playbook executed successfully:
-
-1. Indicator 1 (e.g., Pod is running)
-2. Indicator 2 (e.g., Service is accessible on port X)
-3. Indicator 3 (e.g., Logs show successful startup)
 
 ## Troubleshooting
 
-### Common Error 1: [Error Name]
+<!-- Common errors documented with Problem/Symptoms/Root Cause/Check/Fix format -->
 
-**Symptom:**
-```
-Error message or symptom description
-```
-
-**Root Cause:**
-[Explanation of what causes this error]
-
-**Solution:**
+**Problem:** Pods stuck in Pending state
+**Symptoms:** `kubectl get pods -n my-app` shows `Pending` for more than 5 minutes
+**Root Cause:** Insufficient cluster resources (CPU/memory) or no available nodes
+**Check:**
 ```bash
-# Commands to fix the issue
-fix-command
+# Check pod events
+kubectl describe pod <pod-name> -n my-app | grep -A 10 Events
+
+# Check node resources
+kubectl top nodes
+
+# Check resource requests
+kubectl describe pod <pod-name> -n my-app | grep -A 5 "Requests:"
+```
+**Fix:**
+```bash
+# If using Minikube, increase resources
+minikube delete
+minikube start --memory=8192 --cpus=4
+
+# Verify resources available
+kubectl top nodes
+
+# Redeploy
+helm upgrade my-release my-repo/my-chart -n my-app
 ```
 
 ---
 
-### Common Error 2: [Error Name]
-
-**Symptom:**
-```
-Error message or symptom description
-```
-
-**Root Cause:**
-[Explanation of what causes this error]
-
-**Solution:**
+**Problem:** ImagePullBackOff error
+**Symptoms:** `kubectl get pods -n my-app` shows `ImagePullBackOff` or `ErrImagePull`
+**Root Cause:** Container image not found in registry or authentication required
+**Check:**
 ```bash
-# Commands to fix the issue
-fix-command
+# Check pod events for image pull errors
+kubectl describe pod <pod-name> -n my-app | grep -A 5 "Failed to pull image"
+
+# Verify image name
+kubectl get deployment my-release -n my-app -o yaml | grep image:
+```
+**Fix:**
+```bash
+# Verify image exists
+docker pull <image-name>:<tag>
+
+# If authentication required, create image pull secret
+kubectl create secret docker-registry regcred \
+  --docker-server=<registry-url> \
+  --docker-username=<username> \
+  --docker-password=<password> \
+  -n my-app
+
+# Update deployment to use secret
+helm upgrade my-release my-repo/my-chart \
+  --namespace my-app \
+  --set imagePullSecrets[0].name=regcred
 ```
 
 ---
 
-### Common Error 3: [Error Name]
-
-**Symptom:**
-```
-Error message or symptom description
-```
-
-**Root Cause:**
-[Explanation of what causes this error]
-
-**Solution:**
+**Problem:** Helm installation timeout
+**Symptoms:** `Error: timed out waiting for the condition` during helm install
+**Root Cause:** Pods taking longer than timeout to become ready
+**Check:**
 ```bash
-# Commands to fix the issue
-fix-command
+# Check pod status
+kubectl get pods -n my-app
+
+# Check pod events
+kubectl describe pod <pod-name> -n my-app
 ```
-
-## Rollback Procedure
-
-If something goes wrong, follow these steps to rollback:
-
-### Step 1: [Rollback Action]
+**Fix:**
 ```bash
-# Rollback command
-```
+# Increase timeout
+helm install my-release my-repo/my-chart \
+  --namespace my-app \
+  --wait --timeout=10m  # Increased from 5m to 10m
 
-### Step 2: [Rollback Action]
-```bash
-# Rollback command
-```
+# Or skip waiting and monitor manually
+helm install my-release my-repo/my-chart \
+  --namespace my-app \
+  --wait=false
 
-### Step 3: Verify Rollback
-```bash
-# Verification command
-```
-
-## Notes
-
-### Important Considerations
-
-- Note 1
-- Note 2
-- Note 3
-
-### Performance Impact
-
-- Expected execution time: [X minutes]
-- Resource requirements: [CPU/Memory/Disk]
-- Network bandwidth: [if applicable]
-
-### Security Considerations
-
-- Security note 1
-- Security note 2
-
-## Examples
-
-### Example 1: [Use Case Name]
-
-**Scenario:** [Description]
-
-**Commands:**
-```bash
-# Example commands
-```
-
-**Result:**
-```
-Expected outcome
+# Monitor progress
+watch kubectl get pods -n my-app
 ```
 
 ---
 
-### Example 2: [Use Case Name]
+<!-- Add more troubleshooting entries based on actual execution failures -->
+<!-- After 3 occurrences of same error, MUST add troubleshooting entry -->
 
-**Scenario:** [Description]
+## Notes & References
 
-**Commands:**
+<!-- Optional section for additional context -->
+
+**Important Considerations:**
+- This playbook creates resources that consume cluster resources
+- Cleanup is required to free resources after testing
+- Default configuration uses 3 replicas - adjust for your cluster size
+
+**Performance:**
+- Estimated execution time: 20 minutes (includes pod startup)
+- Resource usage: ~2 CPU cores, ~4GB RAM
+- Network bandwidth: ~500MB for image pulls
+
+**Security:**
+- Uses default service account (no RBAC configuration)
+- No TLS/HTTPS configured (add for production)
+- No network policies applied (cluster-default)
+
+**Related Playbooks:**
+- `namespace-setup` - Prerequisite for namespace creation
+- `postgresql-k8s-setup` - Database setup for this application
+
+**External References:**
+- [Helm Chart Documentation](https://charts.example.com/my-chart)
+- [Kubernetes Deployment Guide](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
+- [Helm Best Practices](https://helm.sh/docs/chart_best_practices/)
+
+## Rollback Instructions
+
+<!-- Optional section for undoing changes -->
+
+If you need to rollback this deployment:
+
+### Step 1: Uninstall Helm Release
 ```bash
-# Example commands
+# Remove Helm release
+helm uninstall my-release -n my-app
+
+# Verify removal
+helm list -n my-app
+# Should show no releases
 ```
 
-**Result:**
-```
-Expected outcome
+### Step 2: Delete Namespace (Optional)
+```bash
+# Delete namespace (removes all resources)
+kubectl delete namespace my-app
+
+# Verify deletion
+kubectl get namespace my-app
+# Should show: Error from server (NotFound)
 ```
 
-## References
+### Step 3: Verify Cleanup
+```bash
+# Verify no resources remain
+kubectl get all -n my-app
+# Should show: No resources found
 
-- [Related documentation link 1]
-- [Related documentation link 2]
-- [External resource link 3]
+# Verify no persistent volumes left
+kubectl get pv | grep my-app
+# Should show no results
+```
+
+## Next Steps
+
+<!-- Optional section for post-completion actions -->
+
+After completing this playbook:
+
+1. **Configure Monitoring**: Set up Prometheus/Grafana for metrics
+2. **Enable Logging**: Configure log aggregation (ELK/Loki)
+3. **Add Ingress**: Expose service via Ingress controller
+4. **Configure Autoscaling**: Set up HPA for automatic scaling
+5. **Security Hardening**: Apply network policies and RBAC
 
 ## Version History
 
-| Version | Date | Changes | Author |
-|---------|------|---------|--------|
-| 1.0.0 | YYYY-MM-DD | Initial playbook | [Name] |
+<!-- Track playbook evolution -->
 
-## CAPS Compliance
+| Version | Date       | Changes                          | Author |
+|---------|------------|----------------------------------|--------|
+| 1.0.0   | 2025-12-19 | Initial playbook                 | Claude |
 
-This playbook conforms to CAPS (Common Agent Playbook Specification) format and can be compiled to:
-- Claude Skills (`.claude/skills/`)
-- Goose Recipes (`.goose/recipes/`)
+---
 
-**Compilation Commands:**
+**Compilation:** This playbook compiles to Claude Skills format using:
 ```bash
-# Compile to Claude Skill
-bash caps-library/scripts/caps-to-skills.sh [playbook-name] --validate
-
-# Compile to Goose Recipe
-bash caps-library/scripts/caps-to-recipes.sh [playbook-name] --validate
+bash caps-library/scripts/caps-to-skills.sh <playbook-name> --validate
 ```
+
+**For authoring guidelines, see**: [`caps-library/docs/best-practices.md`](./best-practices.md)
+**For validation errors, see**: [`caps-library/docs/validation-guide.md`](./validation-guide.md)

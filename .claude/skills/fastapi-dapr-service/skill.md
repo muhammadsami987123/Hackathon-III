@@ -16,6 +16,6 @@ bash caps-library/scripts/caps-to-skills.sh fastapi-dapr-service --validate
 ---
 
 **Source Playbook:** `caps-library/playbooks/fastapi-dapr-service/playbook.md`
-**Compiled:** 2025-12-19 15:06:14 UTC
+**Compiled:** 2025-12-19 16:12:01 UTC
 **CAPS Version:** 1.0.0
 **Skill Name:** fastapi-dapr-service

@@ -23,9 +23,9 @@ caps-library/
 │   ├── caps-to-recipes.sh      # CAPS → Goose Recipes compiler
 │   └── validate-output.sh      # Output validation script
 ├── docs/                        # Documentation
-│   ├── caps-playbook-template.md
-│   ├── authoring-guide.md
-│   └── best-practices.md
+│   ├── caps-playbook-template.md  # Starter template for new playbooks
+│   ├── best-practices.md          # Authoring guidelines
+│   └── validation-guide.md        # Common errors and fixes
 └── examples/                    # Example invocations
     └── hello-world-usage.md
 
@@ -171,16 +171,57 @@ Examples:
 
 ## Validation & Testing
 
+### Automated Validation
+
+The compilation script includes built-in validation to catch errors early:
+
+```bash
+# Compile with validation (recommended)
+bash caps-library/scripts/caps-to-skills.sh <playbook-name> --validate
+```
+
+**What Gets Validated**:
+
+**Critical Errors** (Block Compilation):
+- ✅ Required YAML frontmatter fields (`title`, `description`, `version`, `allowed_tools`, `prerequisites`)
+- ✅ Valid YAML syntax (colons, indentation, quotes)
+- ✅ Required markdown sections (`## Prerequisites`, `## Instructions`, `## Validation`, `## Troubleshooting`)
+- ✅ Matched code block markers (even number of ` ``` `)
+
+**Quality Warnings** (Allow Compilation):
+- ⚠️ Hardcoded secrets (pattern: `password|apikey|token|secret`)
+- ⚠️ Non-consecutive step numbering (Step 1, Step 3)
+- ⚠️ Unknown tools (not in whitelist: bash, kubectl, helm, docker, git, python, npm, curl, etc.)
+- ⚠️ Untestable prerequisites (vague/subjective conditions)
+
+**For detailed error fixes, see**: [`docs/validation-guide.md`](./docs/validation-guide.md)
+
 ### Pre-Compilation Validation
 
 Before compiling, ensure your playbook:
 
-- [ ] Has all required sections
-- [ ] Uses consistent formatting
+- [ ] Has all 5 required YAML fields (title, description, version, allowed_tools, prerequisites)
+- [ ] Has all 4 required sections (Prerequisites, Instructions, Validation, Troubleshooting)
+- [ ] Uses ` ```bash ` for all command blocks
+- [ ] Has matched code block markers (count with: `grep -c '^```' playbook.md`)
 - [ ] Includes success criteria for each step
-- [ ] Documents all prerequisites
-- [ ] Provides troubleshooting guidance
-- [ ] Has working rollback procedures
+- [ ] Documents all prerequisites with verification commands
+- [ ] Provides troubleshooting for common errors
+
+**Quick Validation Checklist**:
+```bash
+# Check required fields exist
+grep "^title:\|^description:\|^version:\|^allowed_tools:\|^prerequisites:" playbook.md
+
+# Check required sections exist
+grep "^## Prerequisites\|^## Instructions\|^## Validation\|^## Troubleshooting" playbook.md
+
+# Count code blocks (should be even)
+grep -c '^```' playbook.md
+
+# Look for potential hardcoded secrets
+grep -i "password\|apikey\|token\|secret" playbook.md
+```
 
 ### Post-Compilation Testing
 
@@ -194,15 +235,44 @@ ls -la .goose/recipes/<playbook-name>.md
 # 2. Check file content
 cat .claude/skills/<playbook-name>/skill.md
 
-# 3. Test with actual agents
+# 3. Verify YAML frontmatter and sections
+head -10 .claude/skills/<playbook-name>/skill.md  # Check YAML
+grep "^## " .claude/skills/<playbook-name>/skill.md  # Check sections
+
+# 4. Test with actual agents
 # - Claude: Use the skill in Claude Code CLI
 # - Goose: Invoke via Goose CLI
 
-# 4. Refine playbook based on results
+# 5. Refine playbook based on results
 # - Document failures in Troubleshooting section
 # - Update Steps with more clarity
 # - Re-compile and re-test
 ```
+
+### Common Validation Errors & Fixes
+
+**Error**: `Missing required field: title`
+**Fix**: Add to YAML frontmatter:
+```yaml
+---
+title: Your Playbook Title
+```
+
+**Error**: `Missing required section: ## Prerequisites`
+**Fix**: Add section with ## heading:
+```markdown
+## Prerequisites
+
+Before starting, verify:
+```bash
+# Verification commands here
+```
+```
+
+**Error**: `Unmatched code block markers (found 7)`
+**Fix**: Every ` ``` ` opening must have matching ` ``` ` closing. Count and fix.
+
+**For complete error reference**: See [`docs/validation-guide.md`](./docs/validation-guide.md)
 
 ## Examples
 
@@ -363,13 +433,70 @@ Version: 1.0.0
 - Ensure proper markdown formatting
 - Verify no syntax errors in playbook.md
 
+## Quick Reference
+
+### Common Compilation Commands
+
+```bash
+# Basic compilation
+bash caps-library/scripts/caps-to-skills.sh <playbook-name>
+
+# With validation (recommended)
+bash caps-library/scripts/caps-to-skills.sh <playbook-name> --validate
+
+# Dry-run (show what would be done)
+bash caps-library/scripts/caps-to-skills.sh <playbook-name> --dry-run
+
+# Custom output directory
+bash caps-library/scripts/caps-to-skills.sh <playbook-name> --output /custom/path
+
+# Compile all playbooks
+for playbook in caps-library/playbooks/*/; do
+  name=$(basename "$playbook")
+  bash caps-library/scripts/caps-to-skills.sh "$name" --validate
+done
+```
+
+### Quick Validation Checks
+
+```bash
+# Check playbook exists
+ls caps-library/playbooks/<playbook-name>/playbook.md
+
+# Validate YAML frontmatter fields
+grep "^title:\|^description:\|^version:\|^allowed_tools:\|^prerequisites:" playbook.md
+
+# Validate required sections
+grep "^## Prerequisites\|^## Instructions\|^## Validation\|^## Troubleshooting" playbook.md
+
+# Count code blocks (should be even)
+grep -c '^```' playbook.md
+
+# Check for hardcoded secrets
+grep -Ei "password|apikey|token|secret" playbook.md
+```
+
+### Troubleshooting Tips
+
+| Issue | Quick Fix |
+|-------|-----------|
+| Compilation fails | Check error message, see [validation-guide.md](./docs/validation-guide.md) |
+| Missing required field | Add field to YAML frontmatter |
+| Missing section | Add `## SectionName` heading |
+| Unmatched code blocks | Count ` ``` ` markers (must be even) |
+| Validation warnings | Review but don't block (warnings are informational) |
+| Output file empty | Check playbook has content in Steps section |
+
 ## Resources
 
 ### Documentation
 
-- CAPS Template: `caps-library/docs/caps-playbook-template.md`
-- Constitution: `.specify/memory/constitution.md`
-- Claude CLI: `CLAUDE.md`
+- **CAPS Template**: [`caps-library/docs/caps-playbook-template.md`](./docs/caps-playbook-template.md) - Starter template
+- **Best Practices**: [`caps-library/docs/best-practices.md`](./docs/best-practices.md) - Authoring guidelines
+- **Validation Guide**: [`caps-library/docs/validation-guide.md`](./docs/validation-guide.md) - Common errors and fixes
+- **Quickstart Guide**: [`specs/001-caps-format-spec/quickstart.md`](../specs/001-caps-format-spec/quickstart.md) - Author your first playbook in 15 min
+- **Constitution**: [`.specify/memory/constitution.md`](../.specify/memory/constitution.md) - Project principles
+- **Claude CLI**: [`CLAUDE.md`](../CLAUDE.md) - Claude Code rules
 
 ### External Links
 

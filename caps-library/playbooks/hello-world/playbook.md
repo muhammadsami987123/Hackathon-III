@@ -1,41 +1,45 @@
+---
+title: Hello World CAPS Playbook
+description: A simple CAPS playbook demonstrating the basic structure and compilation workflow
+version: 1.0.0
+category: example
+tags:
+  - documentation
+  - automation
+  - beginner
+difficulty: beginner
+estimated_time: 5
+allowed_tools:
+  - bash
+prerequisites:
+  - bash_4_or_later
+  - write_permission_current_directory
+---
+
 # Hello World CAPS Playbook
 
-**CAPS Playbook - Hello World Example**
-Version: 1.0.0
-
-## Description
-
-A simple CAPS playbook demonstrating the basic structure and compilation workflow. This playbook creates a hello world script and executes it.
-
-## Metadata
-
-- **Version:** 1.0.0
-- **Author:** Claude Sonnet 4.5
-- **Created:** 2025-12-19
-- **Last Updated:** 2025-12-19
-- **Category:** example
-- **Allowed Tools:** bash, echo, cat
+A simple CAPS playbook demonstrating the basic structure and compilation workflow. This playbook creates a hello world script, executes it, and optionally cleans up.
 
 ## Prerequisites
 
-List all prerequisites that must be satisfied before executing this playbook:
+Before starting, verify:
 
-- [ ] Bash shell available
-- [ ] Write permissions in current directory
-- [ ] Basic Unix commands (echo, cat, chmod) available
+**Required Software:**
+```bash
+# Check Bash version
+bash --version | head -1
+# Expected: GNU bash, version 4.0 or later
 
-### Required Environment
+# Check write permissions
+touch test.txt && rm test.txt && echo "✓ Write permission OK"
+```
 
-- **Operating System:** Any (Linux/macOS/Windows with bash)
-- **Required Software:**
-  - Bash 4.0+
-- **Required Permissions:** Regular user (no sudo required)
+**Required Environment:**
+- Operating System: Any (Linux/macOS/Windows with Bash)
+- Required Permissions: Regular user (no sudo required)
+- No external dependencies
 
-### Required Files/Directories
-
-- None (playbook creates all necessary files)
-
-## Steps
+## Instructions
 
 ### Step 1: Create Hello World Script
 
@@ -94,6 +98,7 @@ cat hello.sh
 Script content:
 #!/bin/bash
 echo "=========================================="
+Hello World from CAPS Playbook!
 ...
 ```
 
@@ -159,51 +164,34 @@ Script successfully removed
 
 ## Validation
 
-### Automated Validation
+Success criteria (all must pass):
 
-Run these commands to verify successful execution:
+- [ ] **Script Created:** `test -f hello.sh && echo "PASS" || echo "FAIL"`
+- [ ] **Script Executable:** `test -x hello.sh && echo "PASS" || echo "FAIL"`
+- [ ] **Output Correct:** `./hello.sh | grep -q "Hello World from CAPS" && echo "PASS" || echo "FAIL"`
 
+**Quick Validation Script:**
 ```bash
-# Check if script exists (should exist after steps 1-3)
-test -f hello.sh && echo "✓ Script exists" || echo "✗ Script not found"
-
-# Check if script is executable
-test -x hello.sh && echo "✓ Script is executable" || echo "✗ Script not executable"
-
-# Validate script output contains expected text
-./hello.sh | grep -q "Hello World from CAPS" && echo "✓ Output correct" || echo "✗ Output incorrect"
+# Run all checks
+test -f hello.sh && \
+  test -x hello.sh && \
+  ./hello.sh | grep -q "Hello World from CAPS" && \
+  echo "✅ All validation checks passed!" || \
+  echo "❌ Some validation checks failed"
 ```
-
-### Manual Verification Checklist
-
-- [ ] hello.sh file was created
-- [ ] Script has executable permissions
-- [ ] Script output displays greeting
-- [ ] Script output includes timestamp and environment info
-- [ ] Cleanup removes the script file
-
-### Success Indicators
-
-List observable indicators that the playbook executed successfully:
-
-1. hello.sh script created in current directory
-2. Script executes without errors and displays formatted greeting
-3. Output includes dynamic information (date, pwd, whoami)
-4. Cleanup successfully removes the script (if executed)
 
 ## Troubleshooting
 
-### Common Error 1: Permission Denied When Executing
-
-**Symptom:**
+**Problem:** Permission denied when executing
+**Symptoms:** `bash: ./hello.sh: Permission denied`
+**Root Cause:** Script was created but not made executable
+**Check:**
+```bash
+# Check file permissions
+ls -la hello.sh
+# Should show -rwx (executable bit set)
 ```
-bash: ./hello.sh: Permission denied
-```
-
-**Root Cause:**
-Script was created but not made executable (chmod +x step skipped or failed)
-
-**Solution:**
+**Fix:**
 ```bash
 # Make the script executable
 chmod +x hello.sh
@@ -214,57 +202,85 @@ ls -la hello.sh
 
 ---
 
-### Common Error 2: Script Not Found
-
-**Symptom:**
-```
-bash: ./hello.sh: No such file or directory
-```
-
-**Root Cause:**
-Script creation failed or wrong directory
-
-**Solution:**
+**Problem:** Script not found
+**Symptoms:** `bash: ./hello.sh: No such file or directory`
+**Root Cause:** Script creation failed or wrong directory
+**Check:**
 ```bash
 # Check current directory
 pwd
 
 # List files to verify script exists
 ls -la | grep hello
+```
+**Fix:**
+```bash
+# Navigate to correct directory
+cd /path/to/expected/directory
 
-# Re-create the script using Step 1 commands
+# Or re-create the script using Step 1 commands
+cat > hello.sh <<'EOF'
+#!/bin/bash
+echo "Hello World from CAPS Playbook!"
+EOF
+chmod +x hello.sh
 ```
 
 ---
 
-### Common Error 3: Command Not Found
-
-**Symptom:**
-```
-bash: cat: command not found
-or
-bash: chmod: command not found
-```
-
-**Root Cause:**
-Basic Unix commands not available in PATH
-
-**Solution:**
+**Problem:** Command not found
+**Symptoms:** `bash: cat: command not found` or `bash: chmod: command not found`
+**Root Cause:** Basic Unix commands not available in PATH
+**Check:**
 ```bash
 # Check if commands exist
 which cat
 which chmod
 which echo
 
+# Check PATH variable
+echo $PATH
+```
+**Fix:**
+```bash
 # Use full paths if needed
 /bin/cat > hello.sh <<'EOF'
-...
+#!/bin/bash
+echo "Hello World"
 EOF
+/bin/chmod +x hello.sh
+
+# Or add standard directories to PATH
+export PATH=$PATH:/bin:/usr/bin
 ```
 
-## Rollback Procedure
+## Notes & References
 
-If something goes wrong, follow these steps to rollback:
+**Important Considerations:**
+- This is a demonstration playbook - no production impact
+- Script creates files in current working directory
+- All operations are reversible with simple rm command
+- No sudo or elevated permissions required
+
+**Performance:**
+- Estimated execution time: < 1 second (5 seconds including reading)
+- Resource requirements: Minimal (< 1KB disk, negligible CPU/memory)
+- Network bandwidth: None
+
+**Security:**
+- No sensitive data involved
+- No network operations
+- No privileged commands
+- Safe for any environment
+
+**Related Documentation:**
+- [CAPS Template](../../docs/caps-playbook-template.md)
+- [Best Practices](../../docs/best-practices.md)
+- [Validation Guide](../../docs/validation-guide.md)
+
+## Rollback Instructions
+
+If something goes wrong:
 
 ### Step 1: Remove Generated Files
 ```bash
@@ -275,115 +291,18 @@ rm -f hello.sh
 ### Step 2: Verify Cleanup
 ```bash
 # Verify no hello.sh file exists
-ls hello.sh 2>&1 || echo "Cleanup successful - no files remaining"
+ls hello.sh 2>&1 || echo "✓ Cleanup successful - no files remaining"
 ```
-
-### Step 3: Reset Environment
-```bash
-# Return to original directory if changed
-cd -
-```
-
-## Notes
-
-### Important Considerations
-
-- This is a demonstration playbook - no production impact
-- Script creates files in current working directory
-- All operations are reversible with simple rm command
-- No sudo or elevated permissions required
-
-### Performance Impact
-
-- Expected execution time: < 1 second
-- Resource requirements: Minimal (< 1KB disk, negligible CPU/memory)
-- Network bandwidth: None
-
-### Security Considerations
-
-- No sensitive data involved
-- No network operations
-- No privileged commands
-- Safe for any environment
-
-## Examples
-
-### Example 1: Basic Execution
-
-**Scenario:** Run the playbook from start to finish including cleanup
-
-**Commands:**
-```bash
-# Execute all steps
-# Step 1: Create script
-cat > hello.sh <<'EOF'
-#!/bin/bash
-echo "Hello World from CAPS Playbook!"
-EOF
-chmod +x hello.sh
-
-# Step 2: Verify
-ls -la hello.sh
-
-# Step 3: Execute
-./hello.sh
-
-# Step 4: Cleanup
-rm hello.sh
-```
-
-**Result:**
-```
-Script created, executed successfully, and cleaned up
-```
-
----
-
-### Example 2: Keep Script for Reuse
-
-**Scenario:** Run playbook but skip cleanup to reuse the script
-
-**Commands:**
-```bash
-# Execute steps 1-3 only (skip step 4)
-cat > hello.sh <<'EOF'
-#!/bin/bash
-echo "Hello World from CAPS Playbook!"
-EOF
-chmod +x hello.sh
-./hello.sh
-
-# Script remains for future use
-```
-
-**Result:**
-```
-Script created and executed, file kept for reuse
-```
-
-## References
-
-- CAPS Specification: `caps-library/docs/caps-playbook-template.md`
-- Constitution: `.specify/memory/constitution.md`
-- Claude CLI Skills: https://claude.com/claude-code
 
 ## Version History
 
-| Version | Date | Changes | Author |
-|---------|------|---------|--------|
-| 1.0.0 | 2025-12-19 | Initial hello world playbook | Claude Sonnet 4.5 |
+| Version | Date       | Changes                          | Author          |
+|---------|------------|----------------------------------|-----------------|
+| 1.0.0   | 2025-12-19 | Initial hello world playbook     | Claude Sonnet 4.5 |
 
-## CAPS Compliance
+---
 
-This playbook conforms to CAPS (Common Agent Playbook Specification) format and can be compiled to:
-- Claude Skills (`.claude/skills/`)
-- Goose Recipes (`.goose/recipes/`)
-
-**Compilation Commands:**
+**Compilation:** This playbook compiles to Claude Skills format using:
 ```bash
-# Compile to Claude Skill
 bash caps-library/scripts/caps-to-skills.sh hello-world --validate
-
-# Compile to Goose Recipe
-bash caps-library/scripts/caps-to-recipes.sh hello-world --validate
 ```

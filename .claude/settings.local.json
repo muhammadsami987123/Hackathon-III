@@ -1,7 +1,23 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(bash:*)",
+      "Bash(tree:*)",
+      "Bash(git push)",
+      "Bash(git fetch:*)",
+      "Bash(git config:*)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File .specify/scripts/powershell/setup-plan.ps1 -Json)",
+      "SlashCommand(/sp.tasks)",
+      "Bash(powershell -ExecutionPolicy Bypass -File:*)",
+      "Bash(ls:*)",
+      "Bash(git push:*)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File .specify/scripts/powershell/check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks)",
+      "Bash(xargs basename:*)",
+      "Bash(for playbook in hello-world kafka-k8s-setup postgresql-k8s-setup fastapi-dapr-service)",
+      "Bash(do echo \"=== Compiling $playbook ===\")",
+      "Bash(done)"
     ]
   }
 }

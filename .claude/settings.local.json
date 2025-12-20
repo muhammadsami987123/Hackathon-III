@@ -17,7 +17,19 @@
       "Bash(xargs basename:*)",
       "Bash(for playbook in hello-world kafka-k8s-setup postgresql-k8s-setup fastapi-dapr-service)",
       "Bash(do echo \"=== Compiling $playbook ===\")",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(test:*)",
+      "Bash(cat:*)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File .specify/scripts/powershell/create-new-feature.ps1 -Json -Number 1 -ShortName \"caps-compiler-guide\" \"CAPS-to-Skills Compiler implementation and usage documentation guide\")",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File .specify/scripts/powershell/update-agent-context.ps1 -AgentType claude)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File .specify/scripts/powershell/check-prerequisites.ps1 -Json)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File .specify/scripts/powershell/check-prerequisites.ps1 -Json -PathsOnly)",
+      "Bash(git checkout:*)",
+      "Bash(Out-String)",
+      "Bash(powershell.exe -Command \"if \\(Test-Path ''F:\\\\Hackathon\\\\Hackathon III\\\\specs\\\\001-caps-compiler-guide\\\\checklists''\\) { Get-ChildItem ''F:\\\\Hackathon\\\\Hackathon III\\\\specs\\\\001-caps-compiler-guide\\\\checklists'' -Filter *.md | Select-Object -ExpandProperty Name }\")",
+      "Bash(powershell.exe -Command \"Get-ChildItem ''F:\\\\Hackathon\\\\Hackathon III\\\\specs\\\\001-caps-compiler-guide\\\\contracts'' -Recurse -File | Select-Object -ExpandProperty FullName\")",
+      "Bash(git rev-parse:*)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -Command \"\n$featureDir = ''specs/001-caps-compiler-guide''\n$phrDir = ''history/prompts/caps-compiler-guide''\nif \\(!\\(Test-Path $phrDir\\)\\) { New-Item -ItemType Directory -Force -Path $phrDir | Out-Null }\n$files = Get-ChildItem -Path $phrDir -Filter ''*.prompt.md'' -ErrorAction SilentlyContinue\n$nextId = if \\($files\\) { \\($files | ForEach-Object { [int]\\($_.Name -replace ''^\\\\D*\\(\\\\d+\\).*'', ''$1''\\) } | Measure-Object -Maximum\\).Maximum + 1 } else { 1 }\n$nextId = ''{0:D3}'' -f $nextId\nWrite-Output $nextId\n\")"
     ]
   }
 }

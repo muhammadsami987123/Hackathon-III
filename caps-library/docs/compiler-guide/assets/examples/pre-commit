@@ -1,0 +1,90 @@
+#!/bin/bash
+# Git Pre-Commit Hook for CAPS-to-Skills Compiler
+# Validates and compiles CAPS playbooks before commit
+#
+# Installation:
+#   cp pre-commit .git/hooks/pre-commit
+#   chmod +x .git/hooks/pre-commit
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+echo -e "${YELLOW}Running CAPS playbook validation...${NC}"
+echo ""
+
+# Get project root
+PROJECT_ROOT=$(git rev-parse --show-toplevel)
+COMPILER="$PROJECT_ROOT/caps-library/scripts/caps-to-skills.sh"
+PLAYBOOKS_DIR="$PROJECT_ROOT/caps-library/playbooks"
+
+# Check if compiler exists
+if [[ ! -f "$COMPILER" ]]; then
+    echo -e "${RED}Error: Compiler not found at $COMPILER${NC}"
+    echo "Skipping CAPS validation"
+    exit 0  # Don't block commit if compiler missing
+fi
+
+# Find modified playbooks in this commit
+MODIFIED_PLAYBOOKS=$(git diff --cached --name-only --diff-filter=ACM | grep "caps-library/playbooks/.*/playbook.md" || true)
+
+if [[ -z "$MODIFIED_PLAYBOOKS" ]]; then
+    echo -e "${GREEN}No CAPS playbooks modified${NC}"
+    exit 0
+fi
+
+# Validate each modified playbook
+VALIDATION_FAILED=false
+
+for playbook_path in $MODIFIED_PLAYBOOKS; do
+    # Extract playbook name from path (e.g., caps-library/playbooks/hello-world/playbook.md → hello-world)
+    playbook_name=$(echo "$playbook_path" | sed 's|caps-library/playbooks/\(.*\)/playbook.md|\1|')
+
+    echo -e "Validating playbook: ${YELLOW}$playbook_name${NC}"
+
+    # Run validation
+    if bash "$COMPILER" "$playbook_name" --validate --dry-run > /dev/null 2>&1; then
+        echo -e "  ${GREEN}✓${NC} Validation passed"
+
+        # Compile the playbook
+        echo -e "  Compiling to skill..."
+        if bash "$COMPILER" "$playbook_name" --validate > /dev/null 2>&1; then
+            echo -e "  ${GREEN}✓${NC} Compilation successful"
+
+            # Stage the generated skill file
+            SKILL_FILE=".claude/skills/$playbook_name/skill.md"
+            if [[ -f "$SKILL_FILE" ]]; then
+                git add "$SKILL_FILE"
+                echo -e "  ${GREEN}✓${NC} Staged generated skill"
+            fi
+        else
+            echo -e "  ${RED}✗${NC} Compilation failed"
+            VALIDATION_FAILED=true
+        fi
+    else
+        echo -e "  ${RED}✗${NC} Validation failed"
+        # Run again with output to show errors
+        bash "$COMPILER" "$playbook_name" --validate --dry-run
+        VALIDATION_FAILED=true
+    fi
+
+    echo ""
+done
+
+# Block commit if validation failed
+if [[ "$VALIDATION_FAILED" == true ]]; then
+    echo -e "${RED}================================================${NC}"
+    echo -e "${RED}Commit blocked: CAPS validation failed${NC}"
+    echo -e "${RED}================================================${NC}"
+    echo ""
+    echo "Fix the validation errors and try again."
+    echo "To skip this hook (not recommended): git commit --no-verify"
+    exit 1
+fi
+
+echo -e "${GREEN}All CAPS playbooks validated successfully!${NC}"
+exit 0

@@ -1,4 +1,4 @@
-# Claude Code Rules - Hackathon III: SP Constitution (Spec-Kit Plus)
+﻿# Claude Code Rules - Hackathon III: SP Constitution (Spec-Kit Plus)
 
 This file provides runtime operational guidance for Claude Code agent within the Hackathon III project. For governance principles, see `.specify/memory/constitution.md`.
 

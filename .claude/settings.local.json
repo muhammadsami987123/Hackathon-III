@@ -29,7 +29,14 @@
       "Bash(powershell.exe -Command \"if \\(Test-Path ''F:\\\\Hackathon\\\\Hackathon III\\\\specs\\\\001-caps-compiler-guide\\\\checklists''\\) { Get-ChildItem ''F:\\\\Hackathon\\\\Hackathon III\\\\specs\\\\001-caps-compiler-guide\\\\checklists'' -Filter *.md | Select-Object -ExpandProperty Name }\")",
       "Bash(powershell.exe -Command \"Get-ChildItem ''F:\\\\Hackathon\\\\Hackathon III\\\\specs\\\\001-caps-compiler-guide\\\\contracts'' -Recurse -File | Select-Object -ExpandProperty FullName\")",
       "Bash(git rev-parse:*)",
-      "Bash(powershell.exe -ExecutionPolicy Bypass -Command \"\n$featureDir = ''specs/001-caps-compiler-guide''\n$phrDir = ''history/prompts/caps-compiler-guide''\nif \\(!\\(Test-Path $phrDir\\)\\) { New-Item -ItemType Directory -Force -Path $phrDir | Out-Null }\n$files = Get-ChildItem -Path $phrDir -Filter ''*.prompt.md'' -ErrorAction SilentlyContinue\n$nextId = if \\($files\\) { \\($files | ForEach-Object { [int]\\($_.Name -replace ''^\\\\D*\\(\\\\d+\\).*'', ''$1''\\) } | Measure-Object -Maximum\\).Maximum + 1 } else { 1 }\n$nextId = ''{0:D3}'' -f $nextId\nWrite-Output $nextId\n\")"
+      "Bash(powershell.exe -ExecutionPolicy Bypass -Command \"\n$featureDir = ''specs/001-caps-compiler-guide''\n$phrDir = ''history/prompts/caps-compiler-guide''\nif \\(!\\(Test-Path $phrDir\\)\\) { New-Item -ItemType Directory -Force -Path $phrDir | Out-Null }\n$files = Get-ChildItem -Path $phrDir -Filter ''*.prompt.md'' -ErrorAction SilentlyContinue\n$nextId = if \\($files\\) { \\($files | ForEach-Object { [int]\\($_.Name -replace ''^\\\\D*\\(\\\\d+\\).*'', ''$1''\\) } | Measure-Object -Maximum\\).Maximum + 1 } else { 1 }\n$nextId = ''{0:D3}'' -f $nextId\nWrite-Output $nextId\n\")",
+      "Bash(powershell.exe:*)",
+      "Bash(chmod:*)",
+      "Bash(for file in *.py)",
+      "Bash(do echo \"Validating $file...\")",
+      "Bash(python3:*)",
+      "Bash(echo:*)",
+      "Bash(for file in *.sh)"
     ]
   }
 }

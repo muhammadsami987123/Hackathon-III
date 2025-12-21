@@ -497,6 +497,7 @@ grep -Ei "password|apikey|token|secret" playbook.md
 - **Quickstart Guide**: [`specs/001-caps-format-spec/quickstart.md`](../specs/001-caps-format-spec/quickstart.md) - Author your first playbook in 15 min
 - **Constitution**: [`.specify/memory/constitution.md`](../.specify/memory/constitution.md) - Project principles
 - **Claude CLI**: [`CLAUDE.md`](../CLAUDE.md) - Claude Code rules
+- **MCP Code Execution Pattern**: [`caps-library/docs/mcp-code-execution/README.md`](./docs/mcp-code-execution/README.md) - Build token-efficient skills (99% reduction)
 
 ### External Links
 

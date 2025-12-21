@@ -1,0 +1,28 @@
+graph TB
+    subgraph Before["Before (MCP loads 50,000 tokens)"]
+        A1["Agent Context Window (300k tokens)"]
+        A2["MCP Tool Definitions (15k tokens)"]
+        A3["Previous Results (25k tokens)"]
+        A4["Conversation (rest)"]
+        A5["45,000 tokens consumed before task"]
+
+        A1 --> A2
+        A2 --> A3
+        A3 --> A4
+        A4 --> A5
+    end
+
+    subgraph After["After (Skill loads 100 tokens)"]
+        B1["Agent Context Window (300k tokens)"]
+        B2["SKILL.md (~100 tokens)"]
+        B3["Script output (~10 tokens)"]
+        B4["Conversation (rest)"]
+        B5["110 tokens consumed, 297k available"]
+
+        B1 --> B2
+        B2 --> B3
+        B3 --> B4
+        B4 --> B5
+    end
+
+    Before -.->|"99.8% reduction"| After

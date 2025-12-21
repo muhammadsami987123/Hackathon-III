@@ -1,0 +1,29 @@
+graph TD
+    Root[".claude/skills/{skill-name}/"]
+
+    SKILL["SKILL.md<br/>What agent loads (~100 tokens)"]
+    REF["REFERENCE.md<br/>Deep docs (loaded on-demand only)"]
+    Scripts["scripts/"]
+    Examples["examples/"]
+
+    Main["main.sh<br/>Entry point"]
+    Deploy["deploy.py<br/>Does actual work"]
+    Verify["verify.py<br/>Checks success"]
+
+    Config["config.yaml<br/>Optional: Usage examples"]
+
+    Root --> SKILL
+    Root --> REF
+    Root --> Scripts
+    Root --> Examples
+
+    Scripts --> Main
+    Scripts --> Deploy
+    Scripts --> Verify
+
+    Examples --> Config
+
+    style SKILL fill:#90EE90
+    style REF fill:#FFD700
+    style Scripts fill:#87CEEB
+    style Examples fill:#DDA0DD

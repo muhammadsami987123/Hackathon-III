@@ -374,6 +374,27 @@ The compiler does not currently use environment variables. All configuration via
 
 ---
 
+## Performance and Token Considerations
+
+When compiling skills, consider the token budget for the generated skill.md files:
+
+**Token Budget Guidelines**:
+- Target: <120 tokens per skill
+- Maximum: 200 tokens recommended
+- Beyond 200: Consider splitting content to REFERENCE.md
+
+**Optimization Strategies**:
+- Move detailed documentation to REFERENCE.md (loaded on-demand)
+- Use external scripts for complex logic (0 tokens in context)
+- Return minimal output from scripts (status only)
+
+For comprehensive guidance on building token-efficient skills, see:
+- [MCP Code Execution Pattern Overview](../mcp-code-execution/README.md)
+- [Solution Architecture](../mcp-code-execution/02-solution-architecture.md)
+- [Skill Structure Best Practices](../mcp-code-execution/03-skill-structure.md)
+
+---
+
 ## Next Steps
 
 - **Automate Workflow**: [Workflow Integration](06-workflow-integration.md)

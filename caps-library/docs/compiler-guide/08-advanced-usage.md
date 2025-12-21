@@ -8,6 +8,8 @@ Advanced patterns and techniques for power users managing large CAPS playbook co
 
 Compile specific subsets of playbooks based on directory structure, naming patterns, or modification time.
 
+**Token Optimization Note**: When compiling multiple skills, ensure each skill follows the MCP Code Execution Pattern to minimize token consumption. See [MCP Pattern Library](../mcp-code-execution/09-best-practices.md) for optimization strategies.
+
 ### Compile by Directory Pattern
 
 ```bash
@@ -57,6 +59,8 @@ done
 ## Batch Processing
 
 Compile multiple playbook libraries efficiently with error handling and reporting.
+
+**MCP Pattern Integration**: When batch compiling skills, follow the [MCP Code Execution Pattern](../mcp-code-execution/README.md) to ensure all generated skills maintain <120 token budgets. See [Writing Efficient Scripts](../mcp-code-execution/04-writing-scripts.md) for implementation guidance.
 
 ### Batch Compilation Script
 
@@ -342,6 +346,8 @@ bash caps-library/scripts/caps-to-skills.sh my-feature -o /mnt/shared/skills/
 
 Advanced automation techniques for large-scale deployments.
 
+**Cross-Agent Testing**: When automating skill deployment, ensure cross-agent compatibility. See [Cross-Agent Testing Guide](../mcp-code-execution/07-cross-agent-testing.md) for the 6-item validation checklist.
+
 ### Cron Job Automation
 
 ```bash
@@ -514,12 +520,68 @@ diff caps-library/playbooks/my-feature/playbook.md .claude/skills/my-feature/ski
 
 ---
 
+## Advanced Pattern References
+
+### MCP Code Execution Pattern Library
+
+For production-grade skill patterns beyond basic compilation, explore the MCP Code Execution Pattern documentation:
+
+#### Selective Compilation Patterns
+- **[Skill Structure](../mcp-code-execution/03-skill-structure.md)** - Learn the 4-part structure (SKILL.md, scripts/, REFERENCE.md, examples/) for minimal token consumption
+- **[Writing Efficient Scripts](../mcp-code-execution/04-writing-scripts.md)** - Python/Bash patterns for external execution (0 tokens in context)
+- **[REFERENCE.md Pattern](../mcp-code-execution/06-reference-pattern.md)** - On-demand documentation strategy
+
+**Use Case**: When compiling skills that wrap MCP tools, follow these patterns to achieve 99.8% token reduction.
+
+#### Batch Processing Patterns
+- **[Complete Kafka Example](../mcp-code-execution/05-kafka-example.md)** - Full working skill with all 4 parts
+- **[Best Practices](../mcp-code-execution/09-best-practices.md)** - DO/DON'T lists for production skills
+- **[Example Skills by Difficulty](../mcp-code-execution/09-best-practices.md#example-skills-to-build)** - Foundation, Infrastructure, Application tiers
+
+**Use Case**: When batch-compiling multiple playbooks, use these examples as templates to maintain consistency.
+
+#### Automation Patterns
+- **[Cross-Agent Testing](../mcp-code-execution/07-cross-agent-testing.md)** - 6-item checklist for Claude Code + Goose compatibility
+- **[Performance Benchmarks](../mcp-code-execution/08-performance-benchmarks.md)** - Token metrics and validation criteria
+
+**Use Case**: Automate validation of compiled skills with cross-agent testing scripts.
+
+### Integration Example: Selective MCP Skill Compilation
+
+```bash
+#!/bin/bash
+# Compile only MCP-wrapping skills with token optimization validation
+
+MCP_SKILLS=("kafka-k8s-setup" "postgresql-k8s-setup" "fastapi-dapr-service")
+
+for skill in "${MCP_SKILLS[@]}"; do
+    echo "Compiling MCP skill: $skill"
+
+    # Compile with validation
+    bash caps-library/scripts/caps-to-skills.sh "$skill" --validate || continue
+
+    # Check token budget (<120 tokens target)
+    skill_file=".claude/skills/$skill/skill.md"
+    token_count=$(wc -w < "$skill_file")
+
+    if (( token_count > 200 )); then
+        echo "[WARNING] $skill exceeds 200 tokens ($token_count)"
+        echo "Consider moving content to REFERENCE.md"
+    else
+        echo "[SUCCESS] $skill: $token_count tokens ✓"
+    fi
+done
+```
+
+---
+
 ## Next Steps
 
 - **Solve Issues**: [Troubleshooting Guide](07-troubleshooting.md)
 - **Automate Workflow**: [Workflow Integration](06-workflow-integration.md)
 - **Command Options**: [Command Reference](05-command-reference.md)
+- **Token Optimization**: [MCP Code Execution Pattern](../mcp-code-execution/README.md)
 
 ---
 
-**Version**: 1.0.0 | **Compiler Version**: 2.0.0 | **Last Updated**: 2025-12-20
+**Version**: 1.0.0 | **Compiler Version**: 2.0.0 | **Last Updated**: 2025-12-21

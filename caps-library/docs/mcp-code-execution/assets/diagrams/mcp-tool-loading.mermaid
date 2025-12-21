@@ -1,0 +1,17 @@
+sequenceDiagram
+    participant Agent
+    participant MCP Server
+    participant Context Window
+
+    Agent->>MCP Server: Connect (session start)
+    MCP Server->>Context Window: Load Tool Definitions
+    Note over Context Window: kubectl_get_pods: 15,000 tokens<br/>24 more tools: ~35,000 tokens<br/>Total: ~50,000 tokens
+
+    Agent->>MCP Server: Call kubectl_get_pods(namespace: "kafka")
+    MCP Server->>Context Window: Return Full Result
+    Note over Context Window: 100+ pods × 250 tokens/pod<br/>= 25,000 tokens added
+
+    Agent->>MCP Server: Call apply_manifest(data: pods)
+    Note over Context Window: Same 25,000 tokens duplicated<br/>Total: 50,000 tokens for one operation
+
+    Note over Context Window: Result: 50,000 (initial) + 50,000 (calls)<br/>= 100,000 tokens consumed

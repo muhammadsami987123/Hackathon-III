@@ -1,0 +1,19 @@
+sequenceDiagram
+    participant Agent
+    participant Tool1 as kubectl_get_pods
+    participant Tool2 as apply_manifest
+    participant Context Window
+
+    Agent->>Tool1: Get pods in namespace "kafka"
+    Tool1->>Context Window: Store Result (25,000 tokens)
+    Note over Context Window: Full pod JSON with metadata,<br/>status, conditions, etc.
+
+    Agent->>Agent: Process result
+    Agent->>Tool2: Apply manifest with pod data
+    Tool2->>Context Window: Store Input (25,000 tokens duplicated)
+    Note over Context Window: Same data written again
+
+    Tool2->>Context Window: Store Result (15,000 tokens)
+    Note over Context Window: Response with applied config
+
+    Note over Context Window: Total: 25k + 25k + 15k = 65,000 tokens<br/>for a simple 2-step operation

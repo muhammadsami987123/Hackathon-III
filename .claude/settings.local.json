@@ -36,7 +36,16 @@
       "Bash(do echo \"Validating $file...\")",
       "Bash(python3:*)",
       "Bash(echo:*)",
-      "Bash(for file in *.sh)"
+      "Bash(for file in *.sh)",
+      "Bash(git -C \"F:/Hackathon/Hackathon III\" rev-parse --git-dir)",
+      "Bash(git --version:*)",
+      "Bash(docker --version:*)",
+      "Bash(minikube version:*)",
+      "Bash(kubectl version:*)",
+      "Bash(helm version:*)",
+      "Bash(claude:*)",
+      "Bash(goose:*)",
+      "Bash(git init:*)"
     ]
   }
 }

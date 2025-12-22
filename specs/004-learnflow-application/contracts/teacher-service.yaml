@@ -1,0 +1,952 @@
+openapi: 3.0.3
+info:
+  title: LearnFlow Teacher Service API
+  version: 1.0.0
+  description: |
+    Teacher-facing features for LearnFlow platform including classroom management,
+    student monitoring, struggle alerts, and custom exercise generation.
+
+    **Functional Requirements**: FR-024 to FR-033
+
+    **Security**: All endpoints require JWT authentication with teacher role.
+  contact:
+    name: LearnFlow Team
+    email: team@learnflow.dev
+
+servers:
+  - url: http://localhost:8082/api/teacher
+    description: Local Minikube development
+  - url: http://teacher-service.learnflow.svc.cluster.local:8082/api/teacher
+    description: Kubernetes cluster internal
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Classrooms
+    description: Create and manage classrooms
+  - name: Monitoring
+    description: Monitor student progress and struggles
+  - name: Exercises
+    description: Generate and assign custom exercises
+  - name: Analytics
+    description: View class analytics
+
+paths:
+  /classrooms:
+    post:
+      tags:
+        - Classrooms
+      summary: Create a new classroom
+      description: |
+        Creates a classroom with a unique join code for student enrollment.
+        Classroom starts in Active state.
+
+        **Requirements**: FR-024 (create classrooms), FR-024a (classroom states)
+      operationId: createClassroom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateClassroomRequest'
+            example:
+              name: "Intro to Python Section A"
+              description: "Fall 2025 semester"
+      responses:
+        '201':
+          description: Classroom created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Classroom'
+              example:
+                id: 550e8400-e29b-41d4-a716-446655440000
+                name: "Intro to Python Section A"
+                description: "Fall 2025 semester"
+                teacher_id: 550e8400-e29b-41d4-a716-446655440001
+                join_code: "ABC123XYZ"
+                status: active
+                student_count: 0
+                created_at: "2025-12-22T10:00:00Z"
+                updated_at: "2025-12-22T10:00:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    get:
+      tags:
+        - Classrooms
+      summary: Get all teacher's classrooms
+      description: |
+        Returns all classrooms created by the authenticated teacher.
+      operationId: getClassrooms
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, archived, all]
+            default: all
+          description: Filter by classroom status
+      responses:
+        '200':
+          description: List of classrooms
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  classrooms:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Classroom'
+              example:
+                classrooms:
+                  - id: 550e8400-e29b-41d4-a716-446655440000
+                    name: "Intro to Python Section A"
+                    status: active
+                    student_count: 24
+                    created_at: "2025-12-22T10:00:00Z"
+                  - id: 550e8400-e29b-41d4-a716-446655440002
+                    name: "Advanced Python Spring 2025"
+                    status: archived
+                    student_count: 30
+                    archived_at: "2025-05-15T18:00:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /classrooms/{id}:
+    get:
+      tags:
+        - Classrooms
+      summary: Get classroom details
+      description: |
+        Returns detailed information about a specific classroom.
+      operationId: getClassroom
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Classroom ID
+      responses:
+        '200':
+          description: Classroom details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassroomDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /classrooms/{id}/archive:
+    post:
+      tags:
+        - Classrooms
+      summary: Archive a classroom
+      description: |
+        Transitions classroom to read-only archived state. No new enrollments,
+        submissions, or progress updates allowed. Past data remains viewable.
+
+        **Requirements**: FR-024b (archive classrooms), FR-024c (read-only access)
+      operationId: archiveClassroom
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Classroom ID
+      responses:
+        '200':
+          description: Classroom archived successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Classroom'
+              example:
+                id: 550e8400-e29b-41d4-a716-446655440000
+                name: "Intro to Python Section A"
+                status: archived
+                archived_at: "2025-12-22T15:30:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /classrooms/{id}/dashboard:
+    get:
+      tags:
+        - Monitoring
+      summary: Get classroom dashboard
+      description: |
+        Returns dashboard with student count, active students, struggling students,
+        and average progress per module.
+
+        **Requirements**: FR-026 (class dashboard), FR-033 (analytics)
+      operationId: getClassroomDashboard
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Classroom ID
+      responses:
+        '200':
+          description: Classroom dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassroomDashboard'
+              example:
+                classroom_id: 550e8400-e29b-41d4-a716-446655440000
+                classroom_name: "Intro to Python Section A"
+                status: active
+                student_count: 24
+                active_today: 18
+                struggling_students: 3
+                unread_alerts: 5
+                module_averages:
+                  - module: 1
+                    name: Basics
+                    average_mastery: 72
+                    completion_rate: 85
+                  - module: 2
+                    name: Control Flow
+                    average_mastery: 58
+                    completion_rate: 60
+                mastery_distribution:
+                  beginner: 4
+                  learning: 10
+                  proficient: 8
+                  mastered: 2
+                common_errors:
+                  - error_type: NameError
+                    count: 45
+                    percentage: 35
+                  - error_type: SyntaxError
+                    count: 32
+                    percentage: 25
+                time_spent_per_topic:
+                  - topic: Variables & Assignment
+                    average_minutes: 45
+                  - topic: If Statements
+                    average_minutes: 62
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /alerts:
+    get:
+      tags:
+        - Monitoring
+      summary: Get struggle alerts
+      description: |
+        Returns struggle alerts for teacher's classrooms. In-app notifications
+        updated in real-time when logged in.
+
+        **Requirements**: FR-027 (struggle alerts), FR-028 (notifications), FR-028b (notification badge)
+      operationId: getAlerts
+      parameters:
+        - name: classroom_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by classroom ID
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [unread, resolved, all]
+            default: unread
+          description: Filter by alert status
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Maximum number of alerts to return
+      responses:
+        '200':
+          description: List of struggle alerts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alerts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StruggleAlert'
+                  unread_count:
+                    type: integer
+                    description: Total unread alert count
+              example:
+                alerts:
+                  - id: 550e8400-e29b-41d4-a716-446655440010
+                    student_id: 550e8400-e29b-41d4-a716-446655440020
+                    student_name: James
+                    classroom_id: 550e8400-e29b-41d4-a716-446655440000
+                    trigger_type: time_stuck
+                    description: "James stuck on list_indexing >10 min"
+                    module: 3
+                    topic: "Lists"
+                    resolved: false
+                    created_at: "2025-12-22T14:15:00Z"
+                  - id: 550e8400-e29b-41d4-a716-446655440011
+                    student_id: 550e8400-e29b-41d4-a716-446655440021
+                    student_name: Sarah
+                    classroom_id: 550e8400-e29b-41d4-a716-446655440000
+                    trigger_type: error_pattern
+                    description: "Sarah: same NameError 3x"
+                    module: 1
+                    topic: "Variables & Assignment"
+                    resolved: false
+                    created_at: "2025-12-22T14:20:00Z"
+                unread_count: 5
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /alerts/{id}/resolve:
+    post:
+      tags:
+        - Monitoring
+      summary: Mark alert as resolved
+      description: |
+        Marks a struggle alert as resolved after teacher intervention.
+      operationId: resolveAlert
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Alert ID
+      responses:
+        '200':
+          description: Alert marked as resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StruggleAlert'
+              example:
+                id: 550e8400-e29b-41d4-a716-446655440010
+                resolved: true
+                resolved_at: "2025-12-22T15:00:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /students/{student_id}/dashboard:
+    get:
+      tags:
+        - Monitoring
+      summary: View individual student dashboard
+      description: |
+        Returns detailed view of student's code submissions, error patterns,
+        and progress for teacher monitoring.
+
+        **Requirements**: FR-029 (view student dashboards)
+      operationId: getStudentDashboard
+      parameters:
+        - name: student_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Student ID
+        - name: classroom_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Classroom ID
+      responses:
+        '200':
+          description: Student dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentDashboard'
+              example:
+                student_id: 550e8400-e29b-41d4-a716-446655440020
+                student_name: James
+                classroom_id: 550e8400-e29b-41d4-a716-446655440000
+                overall_progress: 35
+                recent_submissions:
+                  - exercise_id: ex_045
+                    topic: "List Indexing"
+                    code: "numbers = [1, 2, 3]\nprint(numbers[5])"
+                    error: "IndexError: list index out of range"
+                    submitted_at: "2025-12-22T14:00:00Z"
+                    attempts: 3
+                error_patterns:
+                  - error_type: IndexError
+                    count: 5
+                    topics: ["Lists", "List Indexing"]
+                  - error_type: NameError
+                    count: 8
+                    topics: ["Variables & Assignment", "Functions"]
+                time_spent:
+                  - topic: "List Indexing"
+                    minutes: 45
+                    stuck: true
+                quiz_scores:
+                  - module: 1
+                    topic: "Variables & Assignment"
+                    score: 80
+                  - module: 2
+                    topic: "If Statements"
+                    score: 45
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /exercises/generate:
+    post:
+      tags:
+        - Exercises
+      summary: Generate custom exercises
+      description: |
+        Uses Exercise Agent to generate 3-5 custom practice problems based on
+        topic and difficulty level.
+
+        **Requirements**: FR-030 (generate exercises)
+      operationId: generateExercises
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateExercisesRequest'
+            example:
+              topic: "list_indexing"
+              difficulty: beginner
+              count: 3
+      responses:
+        '200':
+          description: Exercises generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exercises:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GeneratedExercise'
+              example:
+                exercises:
+                  - id: custom_ex_001
+                    question: "Access the second element of the list [10, 20, 30]"
+                    difficulty: beginner
+                    expected_output: "20"
+                    solution: "numbers = [10, 20, 30]\nprint(numbers[1])"
+                  - id: custom_ex_002
+                    question: "Get the last element of the list ['a', 'b', 'c']"
+                    difficulty: beginner
+                    expected_output: "c"
+                    solution: "letters = ['a', 'b', 'c']\nprint(letters[-1])"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /exercises/assign:
+    post:
+      tags:
+        - Exercises
+      summary: Assign exercises to students
+      description: |
+        Assigns generated or existing exercises to specific students with optional deadline.
+
+        **Requirements**: FR-031 (assign exercises), FR-032 (track completion)
+      operationId: assignExercises
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignExercisesRequest'
+            example:
+              classroom_id: 550e8400-e29b-41d4-a716-446655440000
+              student_ids:
+                - 550e8400-e29b-41d4-a716-446655440020
+              exercise_ids:
+                - custom_ex_001
+                - custom_ex_002
+              deadline: "2025-12-24T23:59:59Z"
+              title: "List Indexing Remedial Practice"
+      responses:
+        '201':
+          description: Exercises assigned successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  assignment_id:
+                    type: string
+                    format: uuid
+                  classroom_id:
+                    type: string
+                    format: uuid
+                  student_count:
+                    type: integer
+                  exercise_count:
+                    type: integer
+                  deadline:
+                    type: string
+                    format: date-time
+              example:
+                assignment_id: 550e8400-e29b-41d4-a716-446655440030
+                classroom_id: 550e8400-e29b-41d4-a716-446655440000
+                student_count: 1
+                exercise_count: 2
+                deadline: "2025-12-24T23:59:59Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token with teacher role
+
+  schemas:
+    CreateClassroomRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+          description: Classroom name
+          example: "Intro to Python Section A"
+        description:
+          type: string
+          maxLength: 500
+          description: Optional classroom description
+          example: "Fall 2025 semester"
+
+    Classroom:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        teacher_id:
+          type: string
+          format: uuid
+        join_code:
+          type: string
+          description: Unique code for student enrollment
+          example: "ABC123XYZ"
+        status:
+          type: string
+          enum: [active, archived]
+          description: Classroom status
+        student_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        archived_at:
+          type: string
+          format: date-time
+          description: Timestamp when classroom was archived (null if active)
+        updated_at:
+          type: string
+          format: date-time
+
+    ClassroomDetails:
+      allOf:
+        - $ref: '#/components/schemas/Classroom'
+        - type: object
+          properties:
+            students:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+                  email:
+                    type: string
+                  enrolled_at:
+                    type: string
+                    format: date-time
+
+    ClassroomDashboard:
+      type: object
+      properties:
+        classroom_id:
+          type: string
+          format: uuid
+        classroom_name:
+          type: string
+        status:
+          type: string
+          enum: [active, archived]
+        student_count:
+          type: integer
+        active_today:
+          type: integer
+          description: Students active today
+        struggling_students:
+          type: integer
+          description: Count of students with unresolved alerts
+        unread_alerts:
+          type: integer
+          description: Count of unread struggle alerts
+        module_averages:
+          type: array
+          items:
+            type: object
+            properties:
+              module:
+                type: integer
+              name:
+                type: string
+              average_mastery:
+                type: integer
+              completion_rate:
+                type: integer
+        mastery_distribution:
+          type: object
+          properties:
+            beginner:
+              type: integer
+            learning:
+              type: integer
+            proficient:
+              type: integer
+            mastered:
+              type: integer
+        common_errors:
+          type: array
+          items:
+            type: object
+            properties:
+              error_type:
+                type: string
+              count:
+                type: integer
+              percentage:
+                type: integer
+        time_spent_per_topic:
+          type: array
+          items:
+            type: object
+            properties:
+              topic:
+                type: string
+              average_minutes:
+                type: integer
+
+    StruggleAlert:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        student_id:
+          type: string
+          format: uuid
+        student_name:
+          type: string
+        classroom_id:
+          type: string
+          format: uuid
+        trigger_type:
+          type: string
+          enum: [error_pattern, time_stuck, quiz_failure, help_request, execution_failures]
+          description: Alert trigger type
+        description:
+          type: string
+          description: Human-readable alert description
+        module:
+          type: integer
+        topic:
+          type: string
+        resolved:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+
+    StudentDashboard:
+      type: object
+      properties:
+        student_id:
+          type: string
+          format: uuid
+        student_name:
+          type: string
+        classroom_id:
+          type: string
+          format: uuid
+        overall_progress:
+          type: integer
+        recent_submissions:
+          type: array
+          items:
+            type: object
+            properties:
+              exercise_id:
+                type: string
+              topic:
+                type: string
+              code:
+                type: string
+              error:
+                type: string
+              submitted_at:
+                type: string
+                format: date-time
+              attempts:
+                type: integer
+        error_patterns:
+          type: array
+          items:
+            type: object
+            properties:
+              error_type:
+                type: string
+              count:
+                type: integer
+              topics:
+                type: array
+                items:
+                  type: string
+        time_spent:
+          type: array
+          items:
+            type: object
+            properties:
+              topic:
+                type: string
+              minutes:
+                type: integer
+              stuck:
+                type: boolean
+        quiz_scores:
+          type: array
+          items:
+            type: object
+            properties:
+              module:
+                type: integer
+              topic:
+                type: string
+              score:
+                type: integer
+
+    GenerateExercisesRequest:
+      type: object
+      required:
+        - topic
+        - difficulty
+      properties:
+        topic:
+          type: string
+          description: Topic for exercises
+          example: "list_indexing"
+        difficulty:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        count:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 3
+          description: Number of exercises to generate
+
+    GeneratedExercise:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Generated exercise identifier
+        question:
+          type: string
+        difficulty:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        expected_output:
+          type: string
+        solution:
+          type: string
+          description: Teacher-visible solution code
+
+    AssignExercisesRequest:
+      type: object
+      required:
+        - classroom_id
+        - student_ids
+        - exercise_ids
+      properties:
+        classroom_id:
+          type: string
+          format: uuid
+        student_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Students to assign exercises to
+        exercise_ids:
+          type: array
+          items:
+            type: string
+          description: Exercise IDs to assign
+        deadline:
+          type: string
+          format: date-time
+          description: Optional deadline for completion
+        title:
+          type: string
+          description: Assignment title
+          example: "List Indexing Remedial Practice"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: validation_error
+            message: Invalid classroom name
+
+    Unauthorized:
+      description: Authentication required or teacher role required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: unauthorized
+            message: Valid JWT token with teacher role required
+
+    Forbidden:
+      description: Access denied to this resource
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: forbidden
+            message: You do not have permission to access this classroom
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: not_found
+            message: Classroom not found
+
+    ServiceUnavailable:
+      description: AI agent service unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: service_unavailable
+            message: Exercise generation service is temporarily unavailable
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: internal_error
+            message: An unexpected error occurred

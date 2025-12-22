@@ -1,0 +1,756 @@
+openapi: 3.0.3
+info:
+  title: LearnFlow AI Agent Service API
+  version: 1.0.0
+  description: |
+    AI agent orchestration service for LearnFlow platform. Routes student questions
+    to specialized agents (Triage, Concepts, Code Review, Debug, Exercise, Progress)
+    and provides intelligent tutoring responses.
+
+    **Functional Requirements**: FR-034 to FR-039a
+
+    **Performance**: All agents must respond within 3 seconds or fallback to pre-scripted responses.
+
+    **AI Models**: Uses OpenAI GPT-4 or equivalent for agent reasoning.
+  contact:
+    name: LearnFlow Team
+    email: team@learnflow.dev
+
+servers:
+  - url: http://localhost:8083/api/ai
+    description: Local Minikube development
+  - url: http://ai-agent-service.learnflow.svc.cluster.local:8083/api/ai
+    description: Kubernetes cluster internal
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Triage
+    description: Route questions to appropriate agents
+  - name: Concepts
+    description: Explain Python concepts
+  - name: Code Review
+    description: Analyze code quality
+  - name: Debug
+    description: Diagnose errors
+  - name: Exercise
+    description: Generate practice problems
+  - name: Progress
+    description: Track learning metrics
+
+paths:
+  /triage:
+    post:
+      tags:
+        - Triage
+      summary: Route question to appropriate AI agent
+      description: |
+        Analyzes student question and routes to the appropriate specialized agent
+        based on keywords, context, and intent.
+
+        **Requirements**: FR-034 (Triage Agent), FR-015 (agent routing)
+
+        **Routing Logic**:
+        - Keywords like "what is", "explain", "how does" → Concepts Agent
+        - Keywords like "error", "bug", "not working" → Debug Agent
+        - Keywords like "improve", "review", "feedback" → Code Review Agent
+        - Keywords like "practice", "exercise", "more problems" → Exercise Agent
+        - Keywords like "progress", "mastery", "how am I doing" → Progress Agent
+      operationId: triageQuestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TriageRequest'
+            example:
+              message: "How do variables work in Python?"
+              context:
+                module: 1
+                topic: "variables-assignment"
+                student_mastery: 45
+      responses:
+        '200':
+          description: Routing decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TriageResponse'
+              example:
+                target_agent: concepts
+                confidence: 0.95
+                reasoning: "Question asks for explanation of a fundamental concept"
+                response_time: 0.15
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /concepts:
+    post:
+      tags:
+        - Concepts
+      summary: Explain Python concepts
+      description: |
+        Provides clear explanations of Python topics with code examples adapted
+        to the student's mastery level.
+
+        **Requirements**: FR-035 (Concepts Agent)
+
+        **Adaptation**: Explanations are simplified for beginner mastery (0-40%),
+        include more examples for learning level (41-70%), and provide advanced
+        details for proficient/mastered levels (71-100%).
+      operationId: explainConcept
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConceptsRequest'
+            example:
+              message: "How do variables work in Python?"
+              context:
+                module: 1
+                topic: "variables-assignment"
+                student_mastery: 45
+      responses:
+        '200':
+          description: Concept explanation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConceptsResponse'
+              example:
+                explanation: "Variables are containers for storing data values. Think of them like labeled boxes where you can put information. In Python, you create a variable by giving it a name and assigning a value using the = operator."
+                code_example: "name = 'Maya'  # String variable\nage = 16      # Integer variable\nprint(name)   # Output: Maya"
+                key_points:
+                  - "Variables store data values"
+                  - "Use = for assignment"
+                  - "Variable names should be descriptive"
+                related_topics:
+                  - "Data Types"
+                  - "Operators"
+                response_time: 2.3
+                fallback: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          description: AI unavailable, fallback response provided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConceptsResponse'
+              example:
+                explanation: "AI unavailable - showing general guidance: Variables are names that store values. You assign values using the = operator."
+                code_example: "x = 10\nname = 'Python'"
+                response_time: 0.05
+                fallback: true
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /code-review:
+    post:
+      tags:
+        - Code Review
+      summary: Review code quality
+      description: |
+        Analyzes student code for quality, style (PEP 8), and best practices.
+        Provides actionable feedback and suggestions.
+
+        **Requirements**: FR-036 (Code Review Agent)
+
+        **Standards**: PEP 8 style guide, Pythonic idioms, code readability.
+      operationId: reviewCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeReviewRequest'
+            example:
+              code: "x=10\ny=20\nprint(x+y)"
+              context:
+                exercise_id: "ex_001"
+                module: 1
+                topic: "variables-assignment"
+      responses:
+        '200':
+          description: Code review feedback
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodeReviewResponse'
+              example:
+                grade: 75
+                feedback: "Code works correctly but has style issues. Consider improving variable names and adding spaces around operators."
+                suggestions:
+                  - "Add spaces around = and + operators (PEP 8)"
+                  - "Use descriptive variable names instead of x, y"
+                  - "Consider adding a comment explaining the calculation"
+                strengths:
+                  - "Correct syntax"
+                  - "Produces expected output"
+                style_violations:
+                  - line: 1
+                    issue: "E225 missing whitespace around operator"
+                    suggestion: "x = 10"
+                improved_code: "# Calculate sum of two numbers\nfirst_number = 10\nsecond_number = 20\nprint(first_number + second_number)"
+                response_time: 1.8
+                fallback: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /debug:
+    post:
+      tags:
+        - Debug
+      summary: Diagnose code errors
+      description: |
+        Analyzes errors and provides hints for debugging without giving away solutions.
+        Helps students learn to fix problems independently.
+
+        **Requirements**: FR-037 (Debug Agent)
+
+        **Approach**: Diagnostic questions, hints, not direct solutions.
+      operationId: debugError
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DebugRequest'
+            example:
+              code: "print(x)"
+              error: "NameError: name 'x' is not defined"
+              context:
+                module: 1
+                topic: "variables-assignment"
+                attempts: 2
+      responses:
+        '200':
+          description: Debug assistance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DebugResponse'
+              example:
+                diagnosis: "You're trying to use a variable 'x' that hasn't been created yet. Python needs to know what 'x' is before you can print it."
+                hints:
+                  - "Check if you defined the variable before using it"
+                  - "Look at the line number in the error - is 'x' defined before that line?"
+                  - "Remember: you need to assign a value to a variable before printing it"
+                questions_to_ask:
+                  - "Did you create the variable 'x' before trying to print it?"
+                  - "Is the variable name spelled correctly?"
+                related_concepts:
+                  - "Variable assignment"
+                  - "Variable scope"
+                response_time: 2.1
+                fallback: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /exercise:
+    post:
+      tags:
+        - Exercise
+      summary: Generate practice problems
+      description: |
+        Creates custom exercises based on topic and difficulty level.
+        Used by teachers for remedial work and by system for adaptive learning.
+
+        **Requirements**: FR-038 (Exercise Agent)
+      operationId: generateExercise
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExerciseRequest'
+            example:
+              topic: "list_indexing"
+              difficulty: beginner
+              count: 3
+              context:
+                student_mastery: 30
+                recent_errors: ["IndexError"]
+      responses:
+        '200':
+          description: Generated exercises
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExerciseResponse'
+              example:
+                exercises:
+                  - question: "Access the first element of the list [5, 10, 15]"
+                    difficulty: beginner
+                    expected_output: "5"
+                    test_cases:
+                      - input: "[5, 10, 15]"
+                        expected: "5"
+                    hints:
+                      - "Remember: Python uses 0-based indexing"
+                      - "The first element is at index 0"
+                    solution: "numbers = [5, 10, 15]\nprint(numbers[0])"
+                  - question: "Get the last element of the list ['a', 'b', 'c']"
+                    difficulty: beginner
+                    expected_output: "c"
+                    test_cases:
+                      - input: "['a', 'b', 'c']"
+                        expected: "c"
+                    hints:
+                      - "You can use negative indexing"
+                      - "Index -1 gives you the last element"
+                    solution: "letters = ['a', 'b', 'c']\nprint(letters[-1])"
+                response_time: 2.7
+                fallback: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /progress:
+    post:
+      tags:
+        - Progress
+      summary: Analyze learning progress
+      description: |
+        Provides progress reports with insights, recommendations, and encouragement.
+
+        **Requirements**: FR-039 (Progress Agent)
+      operationId: analyzeProgress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProgressRequest'
+            example:
+              student_id: "550e8400-e29b-41d4-a716-446655440000"
+              time_period: "last_week"
+      responses:
+        '200':
+          description: Progress analysis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgressResponse'
+              example:
+                summary: "Great progress this week! You've completed 8 exercises and improved your mastery in Control Flow by 15%."
+                highlights:
+                  - "Mastered Variables & Assignment (85% mastery)"
+                  - "Maintained 7-day learning streak"
+                  - "Improved quiz scores from 60% to 80%"
+                areas_for_improvement:
+                  - topic: "List Indexing"
+                    current_mastery: 35
+                    recommendation: "Practice accessing list elements with positive and negative indices"
+                  - topic: "While Loops"
+                    current_mastery: 50
+                    recommendation: "Review loop conditions to avoid infinite loops"
+                next_steps:
+                  - "Complete remaining exercises in Module 2"
+                  - "Take quiz for If Statements"
+                  - "Start learning Functions in Module 4"
+                encouragement: "You're making excellent progress! Keep up the consistent practice."
+                response_time: 1.9
+                fallback: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token with student or teacher role
+
+  schemas:
+    TriageRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: Student's question
+        context:
+          type: object
+          properties:
+            module:
+              type: integer
+            topic:
+              type: string
+            student_mastery:
+              type: integer
+              minimum: 0
+              maximum: 100
+
+    TriageResponse:
+      type: object
+      properties:
+        target_agent:
+          type: string
+          enum: [concepts, debug, code_review, exercise, progress]
+          description: Recommended agent for this question
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Routing confidence score
+        reasoning:
+          type: string
+          description: Explanation of routing decision
+        response_time:
+          type: number
+          format: float
+          description: Processing time in seconds
+
+    ConceptsRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: Concept to explain
+        context:
+          type: object
+          properties:
+            module:
+              type: integer
+            topic:
+              type: string
+            student_mastery:
+              type: integer
+              description: Student's mastery level (0-100)
+
+    ConceptsResponse:
+      type: object
+      properties:
+        explanation:
+          type: string
+          description: Clear explanation adapted to mastery level
+        code_example:
+          type: string
+          description: Illustrative code example
+        key_points:
+          type: array
+          items:
+            type: string
+          description: Key takeaways
+        related_topics:
+          type: array
+          items:
+            type: string
+          description: Related learning topics
+        response_time:
+          type: number
+          format: float
+        fallback:
+          type: boolean
+          description: Whether fallback response was used
+
+    CodeReviewRequest:
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          type: string
+          description: Student's code to review
+        context:
+          type: object
+          properties:
+            exercise_id:
+              type: string
+            module:
+              type: integer
+            topic:
+              type: string
+
+    CodeReviewResponse:
+      type: object
+      properties:
+        grade:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Code quality score
+        feedback:
+          type: string
+          description: Overall feedback summary
+        suggestions:
+          type: array
+          items:
+            type: string
+          description: Specific improvement suggestions
+        strengths:
+          type: array
+          items:
+            type: string
+          description: What the code does well
+        style_violations:
+          type: array
+          items:
+            type: object
+            properties:
+              line:
+                type: integer
+              issue:
+                type: string
+              suggestion:
+                type: string
+        improved_code:
+          type: string
+          description: Suggested improved version
+        response_time:
+          type: number
+          format: float
+        fallback:
+          type: boolean
+
+    DebugRequest:
+      type: object
+      required:
+        - code
+        - error
+      properties:
+        code:
+          type: string
+          description: Code that produced the error
+        error:
+          type: string
+          description: Error message
+        context:
+          type: object
+          properties:
+            module:
+              type: integer
+            topic:
+              type: string
+            attempts:
+              type: integer
+              description: Number of attempts so far
+
+    DebugResponse:
+      type: object
+      properties:
+        diagnosis:
+          type: string
+          description: What went wrong
+        hints:
+          type: array
+          items:
+            type: string
+          description: Debugging hints (not solutions)
+        questions_to_ask:
+          type: array
+          items:
+            type: string
+          description: Diagnostic questions for student
+        related_concepts:
+          type: array
+          items:
+            type: string
+        response_time:
+          type: number
+          format: float
+        fallback:
+          type: boolean
+
+    ExerciseRequest:
+      type: object
+      required:
+        - topic
+        - difficulty
+      properties:
+        topic:
+          type: string
+          description: Topic for exercises
+        difficulty:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        count:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 3
+        context:
+          type: object
+          properties:
+            student_mastery:
+              type: integer
+            recent_errors:
+              type: array
+              items:
+                type: string
+
+    ExerciseResponse:
+      type: object
+      properties:
+        exercises:
+          type: array
+          items:
+            type: object
+            properties:
+              question:
+                type: string
+              difficulty:
+                type: string
+              expected_output:
+                type: string
+              test_cases:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    input:
+                      type: string
+                    expected:
+                      type: string
+              hints:
+                type: array
+                items:
+                  type: string
+              solution:
+                type: string
+                description: Teacher-visible solution
+        response_time:
+          type: number
+          format: float
+        fallback:
+          type: boolean
+
+    ProgressRequest:
+      type: object
+      required:
+        - student_id
+      properties:
+        student_id:
+          type: string
+          format: uuid
+        time_period:
+          type: string
+          enum: [last_day, last_week, last_month, all_time]
+          default: last_week
+
+    ProgressResponse:
+      type: object
+      properties:
+        summary:
+          type: string
+          description: Overall progress summary
+        highlights:
+          type: array
+          items:
+            type: string
+          description: Notable achievements
+        areas_for_improvement:
+          type: array
+          items:
+            type: object
+            properties:
+              topic:
+                type: string
+              current_mastery:
+                type: integer
+              recommendation:
+                type: string
+        next_steps:
+          type: array
+          items:
+            type: string
+          description: Recommended next actions
+        encouragement:
+          type: string
+          description: Motivational message
+        response_time:
+          type: number
+          format: float
+        fallback:
+          type: boolean
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: validation_error
+            message: Invalid difficulty level
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: unauthorized
+            message: Valid JWT token required
+
+    ServiceUnavailable:
+      description: AI service temporarily unavailable, fallback response provided
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: service_unavailable
+            message: AI service is temporarily unavailable. Fallback response provided.
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: internal_error
+            message: An unexpected error occurred

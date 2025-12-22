@@ -1,0 +1,701 @@
+openapi: 3.0.3
+info:
+  title: LearnFlow Code Runner Service API
+  version: 1.0.0
+  description: |
+    Secure code execution sandbox for LearnFlow platform. Executes Python code
+    in isolated Docker containers with resource limits and security constraints.
+    Implements MCP (Model Context Protocol) server for observability.
+
+    **Functional Requirements**: FR-010 to FR-013, FR-058 to FR-063
+
+    **Security**: Sandboxed execution with network isolation, filesystem restrictions,
+    memory limits (50MB), and timeout (5 seconds).
+
+    **MCP Integration**: Exposes state, logs, schema, and metrics for AI agent consumption.
+  contact:
+    name: LearnFlow Team
+    email: team@learnflow.dev
+
+servers:
+  - url: http://localhost:8084/api/code-runner
+    description: Local Minikube development
+  - url: http://code-runner-service.learnflow.svc.cluster.local:8084/api/code-runner
+    description: Kubernetes cluster internal
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Execution
+    description: Execute Python code in sandbox
+  - name: Health
+    description: Service health checks
+  - name: MCP
+    description: Model Context Protocol endpoints
+
+paths:
+  /execute:
+    post:
+      tags:
+        - Execution
+      summary: Execute Python code in sandbox
+      description: |
+        Executes student Python code in a secure sandboxed environment with:
+        - 5-second timeout
+        - 50MB memory limit
+        - No network access
+        - No filesystem access (except /tmp)
+        - No subprocess execution
+        - Blocked imports (os, sys, subprocess, socket)
+
+        **Requirements**: FR-010 (sandbox execution), FR-011 (memory limit),
+        FR-012 (security constraints), FR-013 (capture output)
+
+        **Performance**: 90% of executions complete in <1 second (SC-007)
+      operationId: executeCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecuteRequest'
+            examples:
+              validCode:
+                summary: Valid code execution
+                value:
+                  code: "x = 10\ny = 20\nprint(x + y)"
+                  context:
+                    student_id: "550e8400-e29b-41d4-a716-446655440000"
+                    exercise_id: "ex_001"
+                    module: 1
+                    topic: "variables-assignment"
+              errorCode:
+                summary: Code with runtime error
+                value:
+                  code: "print(undefined_variable)"
+                  context:
+                    student_id: "550e8400-e29b-41d4-a716-446655440000"
+                    exercise_id: "ex_002"
+      responses:
+        '200':
+          description: Code executed successfully (even if code has errors)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecuteResponse'
+              examples:
+                successfulExecution:
+                  summary: Successful execution
+                  value:
+                    execution_id: "550e8400-e29b-41d4-a716-446655440100"
+                    status: success
+                    stdout: "30\n"
+                    stderr: ""
+                    execution_time: 0.23
+                    memory_used_mb: 12.5
+                    exit_code: 0
+                    error: null
+                runtimeError:
+                  summary: Runtime error
+                  value:
+                    execution_id: "550e8400-e29b-41d4-a716-446655440101"
+                    status: error
+                    stdout: ""
+                    stderr: "Traceback (most recent call last):\n  File \"<stdin>\", line 1, in <module>\nNameError: name 'undefined_variable' is not defined"
+                    execution_time: 0.15
+                    memory_used_mb: 10.2
+                    exit_code: 1
+                    error:
+                      type: NameError
+                      message: "name 'undefined_variable' is not defined"
+                      line: 1
+                timeout:
+                  summary: Execution timeout
+                  value:
+                    execution_id: "550e8400-e29b-41d4-a716-446655440102"
+                    status: timeout
+                    stdout: "Infinite loop detected...\n"
+                    stderr: ""
+                    execution_time: 5.0
+                    memory_used_mb: 15.0
+                    exit_code: -1
+                    error:
+                      type: TimeoutError
+                      message: "Execution timeout - code exceeded 5 second limit"
+                memoryLimit:
+                  summary: Memory limit exceeded
+                  value:
+                    execution_id: "550e8400-e29b-41d4-a716-446655440103"
+                    status: error
+                    stdout: ""
+                    stderr: "MemoryError: Memory limit exceeded"
+                    execution_time: 1.2
+                    memory_used_mb: 50.0
+                    exit_code: 1
+                    error:
+                      type: MemoryError
+                      message: "Memory limit exceeded (50MB maximum)"
+                blockedImport:
+                  summary: Blocked library import
+                  value:
+                    execution_id: "550e8400-e29b-41d4-a716-446655440104"
+                    status: error
+                    stdout: ""
+                    stderr: "ImportError: import of 'os' is blocked for security reasons"
+                    execution_time: 0.08
+                    memory_used_mb: 8.0
+                    exit_code: 1
+                    error:
+                      type: ImportError
+                      message: "This library (os) is not allowed in the sandbox for security reasons"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: rate_limit_exceeded
+                message: Too many execution requests. Please wait before submitting more code.
+                details:
+                  retry_after_seconds: 10
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Service health check
+      description: |
+        Returns service health status and dependency health.
+
+        **Requirements**: FR-063 (health check endpoints)
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: healthy
+                version: "1.0.0"
+                uptime_seconds: 3600
+                dependencies:
+                  docker: healthy
+                  redis_queue: healthy
+                  kafka: healthy
+                metrics:
+                  active_executions: 5
+                  queue_size: 12
+                  total_executions_today: 1523
+                timestamp: "2025-12-22T15:30:00Z"
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: unhealthy
+                version: "1.0.0"
+                uptime_seconds: 3600
+                dependencies:
+                  docker: unhealthy
+                  redis_queue: healthy
+                  kafka: degraded
+                errors:
+                  - "Docker daemon not responding"
+                timestamp: "2025-12-22T15:30:00Z"
+
+  /mcp/state:
+    get:
+      tags:
+        - MCP
+      summary: Get current service state (MCP)
+      description: |
+        Returns current service state for AI agent consumption via MCP.
+
+        **Requirements**: FR-058 (observability)
+      operationId: getMCPState
+      security: []
+      responses:
+        '200':
+          description: Current service state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPStateResponse'
+              example:
+                service: code-runner
+                state: running
+                active_executions: 5
+                queue_size: 12
+                resource_usage:
+                  cpu_percent: 45.2
+                  memory_percent: 62.0
+                  disk_percent: 35.0
+                configuration:
+                  max_concurrent_executions: 10
+                  execution_timeout_seconds: 5
+                  memory_limit_mb: 50
+                  allowed_imports:
+                    - math
+                    - random
+                    - datetime
+                  blocked_imports:
+                    - os
+                    - sys
+                    - subprocess
+                    - socket
+                timestamp: "2025-12-22T15:30:00Z"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /mcp/logs:
+    get:
+      tags:
+        - MCP
+      summary: Get recent execution logs (MCP)
+      description: |
+        Returns recent execution logs with structured context.
+
+        **Requirements**: FR-062 (structured logging)
+      operationId: getMCPLogs
+      security: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+          description: Maximum number of logs to return
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [info, warning, error, all]
+            default: all
+          description: Filter by log level
+      responses:
+        '200':
+          description: Recent logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPLogsResponse'
+              example:
+                logs:
+                  - timestamp: "2025-12-22T15:29:45Z"
+                    level: info
+                    message: "Code execution completed successfully"
+                    context:
+                      execution_id: "550e8400-e29b-41d4-a716-446655440100"
+                      student_id: "550e8400-e29b-41d4-a716-446655440000"
+                      execution_time: 0.23
+                      status: success
+                  - timestamp: "2025-12-22T15:29:50Z"
+                    level: error
+                    message: "Execution timeout"
+                    context:
+                      execution_id: "550e8400-e29b-41d4-a716-446655440102"
+                      student_id: "550e8400-e29b-41d4-a716-446655440001"
+                      execution_time: 5.0
+                      status: timeout
+                      error_type: TimeoutError
+                count: 2
+                has_more: true
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /mcp/schema:
+    get:
+      tags:
+        - MCP
+      summary: Get API schema (MCP)
+      description: |
+        Returns OpenAPI schema for AI agent understanding.
+
+        **Requirements**: FR-058 (observability)
+      operationId: getMCPSchema
+      security: []
+      responses:
+        '200':
+          description: OpenAPI schema
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Full OpenAPI 3.0 specification
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /mcp/metrics:
+    get:
+      tags:
+        - MCP
+      summary: Get service metrics (MCP)
+      description: |
+        Returns golden signals and business metrics for monitoring.
+
+        **Requirements**: FR-058 to FR-061 (metrics)
+      operationId: getMCPMetrics
+      security: []
+      responses:
+        '200':
+          description: Service metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPMetricsResponse'
+              example:
+                golden_signals:
+                  latency:
+                    p50_ms: 230
+                    p95_ms: 890
+                    p99_ms: 1450
+                  error_rate_percent: 2.5
+                  throughput_per_second: 15.3
+                business_metrics:
+                  total_executions_today: 1523
+                  successful_executions: 1485
+                  failed_executions: 38
+                  timeout_count: 12
+                  memory_limit_exceeded: 5
+                  blocked_imports: 8
+                  average_execution_time_ms: 340
+                  peak_concurrent_executions: 8
+                resource_metrics:
+                  cpu_usage_percent: 45.2
+                  memory_usage_percent: 62.0
+                  disk_usage_percent: 35.0
+                  network_io_blocked: true
+                timestamp: "2025-12-22T15:30:00Z"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token with student or teacher role
+
+  schemas:
+    ExecuteRequest:
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          type: string
+          description: Python code to execute
+          minLength: 1
+          maxLength: 10000
+          example: "x = 10\ny = 20\nprint(x + y)"
+        context:
+          type: object
+          description: Execution context for tracking
+          properties:
+            student_id:
+              type: string
+              format: uuid
+            exercise_id:
+              type: string
+            module:
+              type: integer
+            topic:
+              type: string
+
+    ExecuteResponse:
+      type: object
+      properties:
+        execution_id:
+          type: string
+          format: uuid
+          description: Unique execution identifier
+        status:
+          type: string
+          enum: [success, error, timeout]
+          description: Execution status
+        stdout:
+          type: string
+          description: Standard output from code execution
+        stderr:
+          type: string
+          description: Standard error from code execution
+        execution_time:
+          type: number
+          format: float
+          description: Execution time in seconds
+        memory_used_mb:
+          type: number
+          format: float
+          description: Memory used in megabytes
+        exit_code:
+          type: integer
+          description: Process exit code
+        error:
+          type: object
+          description: Error details (if status is error or timeout)
+          properties:
+            type:
+              type: string
+              description: Error type (NameError, TimeoutError, etc.)
+            message:
+              type: string
+              description: Human-readable error message
+            line:
+              type: integer
+              description: Line number where error occurred
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          description: Overall service health
+        version:
+          type: string
+          description: Service version
+        uptime_seconds:
+          type: integer
+          description: Service uptime in seconds
+        dependencies:
+          type: object
+          description: Health status of dependencies
+          additionalProperties:
+            type: string
+            enum: [healthy, degraded, unhealthy]
+        metrics:
+          type: object
+          description: Current metrics snapshot
+          properties:
+            active_executions:
+              type: integer
+            queue_size:
+              type: integer
+            total_executions_today:
+              type: integer
+        errors:
+          type: array
+          items:
+            type: string
+          description: List of current errors (if unhealthy)
+        timestamp:
+          type: string
+          format: date-time
+
+    MCPStateResponse:
+      type: object
+      properties:
+        service:
+          type: string
+          description: Service name
+        state:
+          type: string
+          enum: [running, starting, stopping, stopped]
+          description: Current service state
+        active_executions:
+          type: integer
+        queue_size:
+          type: integer
+        resource_usage:
+          type: object
+          properties:
+            cpu_percent:
+              type: number
+              format: float
+            memory_percent:
+              type: number
+              format: float
+            disk_percent:
+              type: number
+              format: float
+        configuration:
+          type: object
+          description: Current service configuration
+          properties:
+            max_concurrent_executions:
+              type: integer
+            execution_timeout_seconds:
+              type: integer
+            memory_limit_mb:
+              type: integer
+            allowed_imports:
+              type: array
+              items:
+                type: string
+            blocked_imports:
+              type: array
+              items:
+                type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    MCPLogsResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            type: object
+            properties:
+              timestamp:
+                type: string
+                format: date-time
+              level:
+                type: string
+                enum: [info, warning, error]
+              message:
+                type: string
+              context:
+                type: object
+                description: Structured log context
+                additionalProperties: true
+        count:
+          type: integer
+          description: Number of logs returned
+        has_more:
+          type: boolean
+          description: Whether more logs are available
+
+    MCPMetricsResponse:
+      type: object
+      properties:
+        golden_signals:
+          type: object
+          description: Golden signals (latency, errors, throughput)
+          properties:
+            latency:
+              type: object
+              properties:
+                p50_ms:
+                  type: integer
+                p95_ms:
+                  type: integer
+                p99_ms:
+                  type: integer
+            error_rate_percent:
+              type: number
+              format: float
+            throughput_per_second:
+              type: number
+              format: float
+        business_metrics:
+          type: object
+          properties:
+            total_executions_today:
+              type: integer
+            successful_executions:
+              type: integer
+            failed_executions:
+              type: integer
+            timeout_count:
+              type: integer
+            memory_limit_exceeded:
+              type: integer
+            blocked_imports:
+              type: integer
+            average_execution_time_ms:
+              type: integer
+            peak_concurrent_executions:
+              type: integer
+        resource_metrics:
+          type: object
+          properties:
+            cpu_usage_percent:
+              type: number
+              format: float
+            memory_usage_percent:
+              type: number
+              format: float
+            disk_usage_percent:
+              type: number
+              format: float
+            network_io_blocked:
+              type: boolean
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            emptyCode:
+              summary: Empty code submission
+              value:
+                error: validation_error
+                message: Code cannot be empty
+            codeTooLarge:
+              summary: Code exceeds size limit
+              value:
+                error: validation_error
+                message: Code exceeds maximum size of 10,000 characters
+                details:
+                  code_length: 15000
+                  max_length: 10000
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: unauthorized
+            message: Valid JWT token required
+
+    ServiceUnavailable:
+      description: Code execution service unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: service_unavailable
+            message: Code execution service is temporarily unavailable. Please try again in a few moments.
+            details:
+              reason: "Docker daemon not responding"
+              retry_after_seconds: 30
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: internal_error
+            message: An unexpected error occurred during code execution

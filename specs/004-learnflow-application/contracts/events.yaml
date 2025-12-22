@@ -1,0 +1,741 @@
+openapi: 3.0.3
+info:
+  title: LearnFlow Event Schemas
+  version: 1.0.0
+  description: |
+    Kafka event schemas for LearnFlow event-driven architecture.
+    All events use JSON serialization and are published to Apache Kafka topics.
+
+    **Functional Requirements**: FR-047 to FR-051
+
+    **Event-Driven Architecture**: Services publish events to Kafka topics,
+    and consumers subscribe to trigger downstream actions (code review,
+    progress calculation, struggle detection, etc.).
+
+    **Topic Naming Convention**: `learnflow.<domain>.<event-type>`
+
+    **Kafka Configuration**:
+    - Bootstrap servers: kafka.learnflow.svc.cluster.local:9092
+    - Partitions: 3 per topic
+    - Replication factor: 2
+    - Retention: 7 days
+  contact:
+    name: LearnFlow Team
+    email: team@learnflow.dev
+
+servers:
+  - url: kafka://kafka.learnflow.svc.cluster.local:9092
+    description: Kafka cluster in Kubernetes
+
+tags:
+  - name: Code Events
+    description: Code execution and submission events
+  - name: Quiz Events
+    description: Quiz completion events
+  - name: Struggle Events
+    description: Learning struggle detection events
+  - name: Progress Events
+    description: Progress and mastery update events
+
+paths: {}
+
+components:
+  schemas:
+    # ========================================
+    # Code Execution Event (FR-047)
+    # ========================================
+    CodeExecutedEvent:
+      type: object
+      description: |
+        Published when student code is successfully executed in the sandbox.
+
+        **Topic**: `learnflow.code.executed`
+
+        **Producers**: code-runner-service
+
+        **Consumers**:
+        - ai-agent-service (trigger code review)
+        - student-service (update execution history)
+        - teacher-service (update student activity tracking)
+
+        **Requirements**: FR-047 (publish code.executed events)
+      required:
+        - event_id
+        - event_type
+        - timestamp
+        - data
+      properties:
+        event_id:
+          type: string
+          format: uuid
+          description: Unique event identifier
+          example: "550e8400-e29b-41d4-a716-446655440200"
+        event_type:
+          type: string
+          const: "code.executed"
+          description: Event type identifier
+        timestamp:
+          type: string
+          format: date-time
+          description: Event timestamp (ISO 8601)
+          example: "2025-12-22T15:30:00Z"
+        version:
+          type: string
+          description: Event schema version
+          example: "1.0.0"
+        data:
+          type: object
+          required:
+            - execution_id
+            - student_id
+            - exercise_id
+            - code
+            - status
+            - execution_time
+          properties:
+            execution_id:
+              type: string
+              format: uuid
+              description: Unique execution identifier
+              example: "550e8400-e29b-41d4-a716-446655440100"
+            student_id:
+              type: string
+              format: uuid
+              description: Student who submitted the code
+              example: "550e8400-e29b-41d4-a716-446655440000"
+            exercise_id:
+              type: string
+              description: Exercise identifier
+              example: "ex_001"
+            module:
+              type: integer
+              description: Module number
+              example: 1
+            topic:
+              type: string
+              description: Topic name
+              example: "variables-assignment"
+            code:
+              type: string
+              description: Executed code
+              example: "x = 10\ny = 20\nprint(x + y)"
+            status:
+              type: string
+              enum: [success, error, timeout]
+              description: Execution status
+              example: "success"
+            stdout:
+              type: string
+              description: Standard output
+              example: "30\n"
+            stderr:
+              type: string
+              description: Standard error
+              example: ""
+            execution_time:
+              type: number
+              format: float
+              description: Execution time in seconds
+              example: 0.23
+            memory_used_mb:
+              type: number
+              format: float
+              description: Memory used in MB
+              example: 12.5
+            exit_code:
+              type: integer
+              description: Process exit code
+              example: 0
+            error:
+              type: object
+              description: Error details (if status is error or timeout)
+              properties:
+                type:
+                  type: string
+                  example: "NameError"
+                message:
+                  type: string
+                  example: "name 'x' is not defined"
+                line:
+                  type: integer
+                  example: 1
+      example:
+        event_id: "550e8400-e29b-41d4-a716-446655440200"
+        event_type: "code.executed"
+        timestamp: "2025-12-22T15:30:00Z"
+        version: "1.0.0"
+        data:
+          execution_id: "550e8400-e29b-41d4-a716-446655440100"
+          student_id: "550e8400-e29b-41d4-a716-446655440000"
+          exercise_id: "ex_001"
+          module: 1
+          topic: "variables-assignment"
+          code: "x = 10\ny = 20\nprint(x + y)"
+          status: "success"
+          stdout: "30\n"
+          stderr: ""
+          execution_time: 0.23
+          memory_used_mb: 12.5
+          exit_code: 0
+
+    # ========================================
+    # Quiz Submitted Event (FR-048)
+    # ========================================
+    QuizSubmittedEvent:
+      type: object
+      description: |
+        Published when student completes and submits a quiz.
+
+        **Topic**: `learnflow.quiz.submitted`
+
+        **Producers**: student-service
+
+        **Consumers**:
+        - student-service (update progress and mastery calculation)
+        - teacher-service (update class analytics)
+        - ai-agent-service (analyze performance for adaptive recommendations)
+
+        **Requirements**: FR-048 (publish quiz.submitted events)
+      required:
+        - event_id
+        - event_type
+        - timestamp
+        - data
+      properties:
+        event_id:
+          type: string
+          format: uuid
+          description: Unique event identifier
+          example: "550e8400-e29b-41d4-a716-446655440201"
+        event_type:
+          type: string
+          const: "quiz.submitted"
+          description: Event type identifier
+        timestamp:
+          type: string
+          format: date-time
+          description: Event timestamp (ISO 8601)
+          example: "2025-12-22T15:35:00Z"
+        version:
+          type: string
+          description: Event schema version
+          example: "1.0.0"
+        data:
+          type: object
+          required:
+            - quiz_id
+            - student_id
+            - module
+            - topic
+            - score
+            - correct_answers
+            - total_questions
+            - completed_at
+          properties:
+            quiz_id:
+              type: string
+              format: uuid
+              description: Quiz identifier
+              example: "550e8400-e29b-41d4-a716-446655440050"
+            student_id:
+              type: string
+              format: uuid
+              description: Student who took the quiz
+              example: "550e8400-e29b-41d4-a716-446655440000"
+            classroom_id:
+              type: string
+              format: uuid
+              description: Classroom context (optional)
+              example: "550e8400-e29b-41d4-a716-446655440010"
+            module:
+              type: integer
+              description: Module number
+              example: 1
+            topic:
+              type: string
+              description: Topic name
+              example: "variables-assignment"
+            score:
+              type: integer
+              minimum: 0
+              maximum: 100
+              description: Quiz score percentage
+              example: 80
+            correct_answers:
+              type: integer
+              description: Number of correct answers
+              example: 4
+            total_questions:
+              type: integer
+              description: Total number of questions
+              example: 5
+            answers:
+              type: object
+              description: Student's answers (question_id -> answer)
+              additionalProperties:
+                type: string
+              example:
+                q1: "x = 10"
+                q2: "message = 'Hello World'"
+            time_spent_minutes:
+              type: integer
+              description: Time spent on quiz in minutes
+              example: 12
+            completed_at:
+              type: string
+              format: date-time
+              description: Completion timestamp
+              example: "2025-12-22T15:35:00Z"
+            previous_score:
+              type: integer
+              description: Previous quiz score (if retake)
+              example: 60
+      example:
+        event_id: "550e8400-e29b-41d4-a716-446655440201"
+        event_type: "quiz.submitted"
+        timestamp: "2025-12-22T15:35:00Z"
+        version: "1.0.0"
+        data:
+          quiz_id: "550e8400-e29b-41d4-a716-446655440050"
+          student_id: "550e8400-e29b-41d4-a716-446655440000"
+          classroom_id: "550e8400-e29b-41d4-a716-446655440010"
+          module: 1
+          topic: "variables-assignment"
+          score: 80
+          correct_answers: 4
+          total_questions: 5
+          answers:
+            q1: "x = 10"
+            q2: "message = 'Hello World'"
+          time_spent_minutes: 12
+          completed_at: "2025-12-22T15:35:00Z"
+
+    # ========================================
+    # Struggle Detected Event (FR-049)
+    # ========================================
+    StruggleDetectedEvent:
+      type: object
+      description: |
+        Published when system detects a student struggling with a topic.
+
+        **Topic**: `learnflow.struggle.detected`
+
+        **Producers**: student-service (monitoring student activity)
+
+        **Consumers**:
+        - teacher-service (create alert notification)
+        - ai-agent-service (generate remedial exercises)
+        - student-service (track struggle patterns)
+
+        **Requirements**: FR-049 (publish struggle.detected events), FR-027 (trigger types)
+
+        **Trigger Conditions**:
+        - Same error 3+ times
+        - Stuck on topic >10 minutes
+        - Quiz score <50%
+        - "I don't understand" 3+ times
+        - 5+ consecutive execution failures
+      required:
+        - event_id
+        - event_type
+        - timestamp
+        - data
+      properties:
+        event_id:
+          type: string
+          format: uuid
+          description: Unique event identifier
+          example: "550e8400-e29b-41d4-a716-446655440202"
+        event_type:
+          type: string
+          const: "struggle.detected"
+          description: Event type identifier
+        timestamp:
+          type: string
+          format: date-time
+          description: Event timestamp (ISO 8601)
+          example: "2025-12-22T15:40:00Z"
+        version:
+          type: string
+          description: Event schema version
+          example: "1.0.0"
+        data:
+          type: object
+          required:
+            - student_id
+            - trigger_type
+            - module
+            - topic
+            - severity
+          properties:
+            alert_id:
+              type: string
+              format: uuid
+              description: Generated alert identifier
+              example: "550e8400-e29b-41d4-a716-446655440060"
+            student_id:
+              type: string
+              format: uuid
+              description: Struggling student
+              example: "550e8400-e29b-41d4-a716-446655440001"
+            classroom_id:
+              type: string
+              format: uuid
+              description: Classroom context
+              example: "550e8400-e29b-41d4-a716-446655440010"
+            teacher_id:
+              type: string
+              format: uuid
+              description: Classroom teacher (for notifications)
+              example: "550e8400-e29b-41d4-a716-446655440020"
+            trigger_type:
+              type: string
+              enum:
+                - error_pattern
+                - time_stuck
+                - quiz_failure
+                - help_request
+                - execution_failures
+              description: Struggle trigger type
+              example: "time_stuck"
+            module:
+              type: integer
+              description: Module number
+              example: 3
+            topic:
+              type: string
+              description: Topic name
+              example: "list-indexing"
+            severity:
+              type: string
+              enum: [low, medium, high]
+              description: Struggle severity level
+              example: "medium"
+            description:
+              type: string
+              description: Human-readable alert description
+              example: "James stuck on list_indexing >10 min"
+            details:
+              type: object
+              description: Additional context
+              properties:
+                time_stuck_minutes:
+                  type: integer
+                  example: 15
+                error_count:
+                  type: integer
+                  example: 3
+                error_type:
+                  type: string
+                  example: "IndexError"
+                quiz_score:
+                  type: integer
+                  example: 45
+                last_code:
+                  type: string
+                  example: "numbers = [1, 2, 3]\nprint(numbers[5])"
+                help_requests:
+                  type: array
+                  items:
+                    type: string
+                  example: ["I don't understand", "Help with indexing"]
+      example:
+        event_id: "550e8400-e29b-41d4-a716-446655440202"
+        event_type: "struggle.detected"
+        timestamp: "2025-12-22T15:40:00Z"
+        version: "1.0.0"
+        data:
+          alert_id: "550e8400-e29b-41d4-a716-446655440060"
+          student_id: "550e8400-e29b-41d4-a716-446655440001"
+          classroom_id: "550e8400-e29b-41d4-a716-446655440010"
+          teacher_id: "550e8400-e29b-41d4-a716-446655440020"
+          trigger_type: "time_stuck"
+          module: 3
+          topic: "list-indexing"
+          severity: "medium"
+          description: "James stuck on list_indexing >10 min"
+          details:
+            time_stuck_minutes: 15
+            last_code: "numbers = [1, 2, 3]\nprint(numbers[5])"
+
+    # ========================================
+    # Progress Updated Event (FR-050)
+    # ========================================
+    ProgressUpdatedEvent:
+      type: object
+      description: |
+        Published when student's progress or mastery level changes.
+
+        **Topic**: `learnflow.progress.updated`
+
+        **Producers**: student-service (after exercise submission or quiz completion)
+
+        **Consumers**:
+        - teacher-service (update class analytics dashboard)
+        - student-service (update progress visualizations)
+        - ai-agent-service (adjust difficulty recommendations)
+
+        **Requirements**: FR-050 (publish progress.updated events), FR-020 (mastery calculation)
+
+        **Mastery Formula**: (Exercises×0.40) + (Quizzes×0.30) + (Code Quality×0.20) + (Streak×0.10)
+      required:
+        - event_id
+        - event_type
+        - timestamp
+        - data
+      properties:
+        event_id:
+          type: string
+          format: uuid
+          description: Unique event identifier
+          example: "550e8400-e29b-41d4-a716-446655440203"
+        event_type:
+          type: string
+          const: "progress.updated"
+          description: Event type identifier
+        timestamp:
+          type: string
+          format: date-time
+          description: Event timestamp (ISO 8601)
+          example: "2025-12-22T15:45:00Z"
+        version:
+          type: string
+          description: Event schema version
+          example: "1.0.0"
+        data:
+          type: object
+          required:
+            - student_id
+            - module
+            - topic
+            - new_mastery_level
+            - previous_mastery_level
+            - mastery_change
+          properties:
+            student_id:
+              type: string
+              format: uuid
+              description: Student whose progress updated
+              example: "550e8400-e29b-41d4-a716-446655440000"
+            classroom_id:
+              type: string
+              format: uuid
+              description: Classroom context (optional)
+              example: "550e8400-e29b-41d4-a716-446655440010"
+            module:
+              type: integer
+              description: Module number
+              example: 1
+            topic:
+              type: string
+              description: Topic name
+              example: "variables-assignment"
+            new_mastery_level:
+              type: integer
+              minimum: 0
+              maximum: 100
+              description: Updated mastery level (0-100%)
+              example: 68
+            previous_mastery_level:
+              type: integer
+              minimum: 0
+              maximum: 100
+              description: Previous mastery level
+              example: 60
+            mastery_change:
+              type: integer
+              description: Change in mastery level (positive or negative)
+              example: 8
+            new_mastery_badge:
+              type: string
+              enum: [beginner, learning, proficient, mastered]
+              description: Updated mastery badge
+              example: "learning"
+            previous_mastery_badge:
+              type: string
+              enum: [beginner, learning, proficient, mastered]
+              description: Previous mastery badge
+              example: "learning"
+            badge_upgraded:
+              type: boolean
+              description: Whether mastery badge level increased
+              example: false
+            trigger_event:
+              type: string
+              enum: [exercise_submission, quiz_completion, code_review]
+              description: What triggered the progress update
+              example: "quiz_completion"
+            trigger_event_id:
+              type: string
+              format: uuid
+              description: ID of triggering event
+              example: "550e8400-e29b-41d4-a716-446655440050"
+            breakdown:
+              type: object
+              description: Mastery calculation breakdown
+              properties:
+                exercises_score:
+                  type: integer
+                  description: Exercise component (0-100)
+                  example: 75
+                quizzes_score:
+                  type: integer
+                  description: Quiz component (0-100)
+                  example: 80
+                code_quality_score:
+                  type: integer
+                  description: Code quality component (0-100)
+                  example: 65
+                streak_score:
+                  type: integer
+                  description: Streak component (0-100)
+                  example: 70
+            current_streak_days:
+              type: integer
+              description: Current learning streak
+              example: 7
+      example:
+        event_id: "550e8400-e29b-41d4-a716-446655440203"
+        event_type: "progress.updated"
+        timestamp: "2025-12-22T15:45:00Z"
+        version: "1.0.0"
+        data:
+          student_id: "550e8400-e29b-41d4-a716-446655440000"
+          classroom_id: "550e8400-e29b-41d4-a716-446655440010"
+          module: 1
+          topic: "variables-assignment"
+          new_mastery_level: 68
+          previous_mastery_level: 60
+          mastery_change: 8
+          new_mastery_badge: "learning"
+          previous_mastery_badge: "learning"
+          badge_upgraded: false
+          trigger_event: "quiz_completion"
+          trigger_event_id: "550e8400-e29b-41d4-a716-446655440050"
+          breakdown:
+            exercises_score: 75
+            quizzes_score: 80
+            code_quality_score: 65
+            streak_score: 70
+          current_streak_days: 7
+
+  # ========================================
+  # Common Event Metadata
+  # ========================================
+  x-kafka-configuration:
+    bootstrap_servers: "kafka.learnflow.svc.cluster.local:9092"
+    topics:
+      code.executed:
+        name: "learnflow.code.executed"
+        partitions: 3
+        replication_factor: 2
+        retention_ms: 604800000  # 7 days
+        cleanup_policy: delete
+      quiz.submitted:
+        name: "learnflow.quiz.submitted"
+        partitions: 3
+        replication_factor: 2
+        retention_ms: 604800000  # 7 days
+        cleanup_policy: delete
+      struggle.detected:
+        name: "learnflow.struggle.detected"
+        partitions: 3
+        replication_factor: 2
+        retention_ms: 604800000  # 7 days
+        cleanup_policy: delete
+      progress.updated:
+        name: "learnflow.progress.updated"
+        partitions: 3
+        replication_factor: 2
+        retention_ms: 604800000  # 7 days
+        cleanup_policy: delete
+
+  x-consumer-groups:
+    ai-agent-service:
+      group_id: "ai-agent-service-consumers"
+      subscribed_topics:
+        - "learnflow.code.executed"
+        - "learnflow.quiz.submitted"
+        - "learnflow.struggle.detected"
+        - "learnflow.progress.updated"
+      auto_offset_reset: earliest
+      enable_auto_commit: true
+
+    teacher-service:
+      group_id: "teacher-service-consumers"
+      subscribed_topics:
+        - "learnflow.struggle.detected"
+        - "learnflow.progress.updated"
+        - "learnflow.code.executed"
+      auto_offset_reset: earliest
+      enable_auto_commit: true
+
+    student-service:
+      group_id: "student-service-consumers"
+      subscribed_topics:
+        - "learnflow.code.executed"
+        - "learnflow.quiz.submitted"
+        - "learnflow.progress.updated"
+      auto_offset_reset: earliest
+      enable_auto_commit: true
+
+  x-event-flow-examples:
+    code_submission_flow:
+      description: "Complete flow when student submits code"
+      steps:
+        - step: 1
+          actor: "student-service"
+          action: "POST /api/student/submit"
+          description: "Student submits exercise code"
+        - step: 2
+          actor: "code-runner-service"
+          action: "POST /api/code-runner/execute"
+          description: "Code executed in sandbox"
+        - step: 3
+          actor: "code-runner-service"
+          action: "Publish to learnflow.code.executed"
+          description: "Execution result published to Kafka"
+        - step: 4
+          actor: "ai-agent-service"
+          action: "Consume learnflow.code.executed"
+          description: "AI agent performs code review"
+        - step: 5
+          actor: "student-service"
+          action: "Consume learnflow.code.executed"
+          description: "Update student progress and check for struggles"
+        - step: 6
+          actor: "student-service"
+          action: "Publish to learnflow.struggle.detected (if triggered)"
+          description: "Publish struggle event if conditions met"
+        - step: 7
+          actor: "teacher-service"
+          action: "Consume learnflow.struggle.detected"
+          description: "Create alert notification for teacher"
+
+    quiz_completion_flow:
+      description: "Complete flow when student completes quiz"
+      steps:
+        - step: 1
+          actor: "student-service"
+          action: "POST /api/student/quiz/submit"
+          description: "Student submits quiz answers"
+        - step: 2
+          actor: "student-service"
+          action: "Publish to learnflow.quiz.submitted"
+          description: "Quiz result published to Kafka"
+        - step: 3
+          actor: "student-service"
+          action: "Consume learnflow.quiz.submitted"
+          description: "Calculate mastery level with formula"
+        - step: 4
+          actor: "student-service"
+          action: "Publish to learnflow.progress.updated"
+          description: "Updated mastery level published"
+        - step: 5
+          actor: "teacher-service"
+          action: "Consume learnflow.progress.updated"
+          description: "Update class analytics dashboard"
+        - step: 6
+          actor: "ai-agent-service"
+          action: "Consume learnflow.progress.updated"
+          description: "Adjust difficulty recommendations"

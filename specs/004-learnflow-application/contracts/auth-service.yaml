@@ -1,0 +1,455 @@
+openapi: 3.0.3
+info:
+  title: LearnFlow Authentication Service API
+  version: 1.0.0
+  description: |
+    Authentication and user management service for LearnFlow platform.
+    Handles user registration, login, password reset, and JWT token issuance.
+
+    **Functional Requirements**: FR-001 to FR-007
+
+    **Security**: All passwords are hashed using bcrypt. JWT tokens expire after 24 hours.
+  contact:
+    name: LearnFlow Team
+    email: team@learnflow.dev
+
+servers:
+  - url: http://localhost:8080/api/auth
+    description: Local Minikube development
+  - url: http://auth-service.learnflow.svc.cluster.local:8080/api/auth
+    description: Kubernetes cluster internal
+
+tags:
+  - name: Authentication
+    description: User registration, login, and password management
+
+paths:
+  /register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      description: |
+        Creates a new user account (student or teacher) with email, name, and password.
+        Validates email format and password strength. Returns JWT token upon success.
+
+        **Requirements**: FR-001 (student), FR-002 (teacher), FR-003 (email validation), FR-004 (password hashing)
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              studentRegistration:
+                summary: Student registration
+                value:
+                  email: maya.student@example.com
+                  name: Maya Student
+                  password: SecurePass123!
+                  role: student
+              teacherRegistration:
+                summary: Teacher registration
+                value:
+                  email: mr.rodriguez@example.com
+                  name: Mr. Rodriguez
+                  password: TeacherPass456!
+                  role: teacher
+      responses:
+        '201':
+          description: User successfully registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              example:
+                token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                user:
+                  id: 550e8400-e29b-41d4-a716-446655440000
+                  email: maya.student@example.com
+                  name: Maya Student
+                  role: student
+                  created_at: '2025-12-22T10:30:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: conflict
+                message: Email address is already registered
+                details:
+                  email: maya.student@example.com
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /login:
+    post:
+      tags:
+        - Authentication
+      summary: Login to existing account
+      description: |
+        Authenticates user with email and password. Issues JWT token with 24-hour expiration.
+
+        **Requirements**: FR-005 (JWT token), FR-006 (role-based permissions)
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: maya.student@example.com
+              password: SecurePass123!
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              example:
+                token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                user:
+                  id: 550e8400-e29b-41d4-a716-446655440000
+                  email: maya.student@example.com
+                  name: Maya Student
+                  role: student
+                  created_at: '2025-12-22T10:30:00Z'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: unauthorized
+                message: Invalid email or password
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /reset-password:
+    post:
+      tags:
+        - Authentication
+      summary: Initiate password reset
+      description: |
+        Sends a password reset email with verification link to the user's registered email address.
+
+        **Requirements**: FR-007 (password reset)
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+            example:
+              email: maya.student@example.com
+      responses:
+        '200':
+          description: Password reset email sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password reset email sent. Please check your inbox.
+                  reset_token_expires_in:
+                    type: integer
+                    description: Token expiration time in seconds
+                    example: 3600
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: Email not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: not_found
+                message: No account found with this email address
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /reset-password/confirm:
+    post:
+      tags:
+        - Authentication
+      summary: Confirm password reset with token
+      description: |
+        Completes password reset process using the token from email link.
+        Updates password and invalidates the reset token.
+      operationId: confirmPasswordReset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetConfirmRequest'
+            example:
+              token: reset_abc123def456
+              new_password: NewSecurePass789!
+      responses:
+        '200':
+          description: Password successfully reset
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password successfully reset. You can now login with your new password.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: unauthorized
+                message: Password reset token is invalid or has expired
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /verify-token:
+    post:
+      tags:
+        - Authentication
+      summary: Verify JWT token validity
+      description: |
+        Validates a JWT token and returns the associated user information.
+        Used by other services to authenticate requests.
+      operationId: verifyToken
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Token is valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                id: 550e8400-e29b-41d4-a716-446655440000
+                email: maya.student@example.com
+                name: Maya Student
+                role: student
+                created_at: '2025-12-22T10:30:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /login or /register endpoints
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - name
+        - password
+        - role
+      properties:
+        email:
+          type: string
+          format: email
+          description: Valid email address (RFC 5322 compliant)
+          minLength: 5
+          maxLength: 255
+          example: maya.student@example.com
+        name:
+          type: string
+          description: User's full name
+          minLength: 2
+          maxLength: 100
+          example: Maya Student
+        password:
+          type: string
+          format: password
+          description: Strong password (min 8 chars, uppercase, lowercase, number, special char)
+          minLength: 8
+          maxLength: 128
+          example: SecurePass123!
+        role:
+          type: string
+          enum: [student, teacher]
+          description: User role (student or teacher)
+          example: student
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: Registered email address
+          example: maya.student@example.com
+        password:
+          type: string
+          format: password
+          description: User's password
+          example: SecurePass123!
+
+    PasswordResetRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          description: Registered email address for password reset
+          example: maya.student@example.com
+
+    PasswordResetConfirmRequest:
+      type: object
+      required:
+        - token
+        - new_password
+      properties:
+        token:
+          type: string
+          description: Password reset token from email
+          example: reset_abc123def456
+        new_password:
+          type: string
+          format: password
+          description: New password (same requirements as registration)
+          minLength: 8
+          maxLength: 128
+          example: NewSecurePass789!
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT token for authentication (expires in 24 hours)
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique user identifier
+          example: 550e8400-e29b-41d4-a716-446655440000
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: maya.student@example.com
+        name:
+          type: string
+          description: User's full name
+          example: Maya Student
+        role:
+          type: string
+          enum: [student, teacher]
+          description: User role
+          example: student
+        created_at:
+          type: string
+          format: date-time
+          description: Account creation timestamp (ISO 8601)
+          example: '2025-12-22T10:30:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          description: Last account update timestamp (ISO 8601)
+          example: '2025-12-22T10:30:00Z'
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error type identifier
+          example: validation_error
+        message:
+          type: string
+          description: Human-readable error message
+          example: Invalid email format
+        details:
+          type: object
+          description: Additional error details (optional)
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidEmail:
+              summary: Invalid email format
+              value:
+                error: validation_error
+                message: Invalid email format
+                details:
+                  field: email
+                  value: not-an-email
+            weakPassword:
+              summary: Weak password
+              value:
+                error: validation_error
+                message: Password must be at least 8 characters with uppercase, lowercase, number, and special character
+                details:
+                  field: password
+            invalidRole:
+              summary: Invalid role
+              value:
+                error: validation_error
+                message: Role must be either 'student' or 'teacher'
+                details:
+                  field: role
+                  allowed_values: [student, teacher]
+
+    Unauthorized:
+      description: Authentication failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: unauthorized
+            message: Invalid or expired authentication token
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: internal_error
+            message: An unexpected error occurred. Please try again later.

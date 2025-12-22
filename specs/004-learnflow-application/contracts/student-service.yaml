@@ -1,0 +1,828 @@
+openapi: 3.0.3
+info:
+  title: LearnFlow Student Service API
+  version: 1.0.0
+  description: |
+    Student-facing features for LearnFlow platform including module navigation,
+    code execution, AI tutor chat, progress tracking, and quiz management.
+
+    **Functional Requirements**: FR-008 to FR-023
+
+    **Security**: All endpoints require JWT authentication with student role.
+  contact:
+    name: LearnFlow Team
+    email: team@learnflow.dev
+
+servers:
+  - url: http://localhost:8081/api/student
+    description: Local Minikube development
+  - url: http://student-service.learnflow.svc.cluster.local:8081/api/student
+    description: Kubernetes cluster internal
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Modules
+    description: Access curriculum modules and topics
+  - name: Code Execution
+    description: Run and submit code exercises
+  - name: AI Tutor
+    description: Chat with AI tutors
+  - name: Progress
+    description: Track learning progress
+  - name: Quizzes
+    description: Take and submit quizzes
+
+paths:
+  /modules:
+    get:
+      tags:
+        - Modules
+      summary: Get all curriculum modules
+      description: |
+        Returns the complete Python curriculum organized into 8 modules with topics,
+        progress indicators, and metadata.
+
+        **Requirements**: FR-008 (curriculum structure)
+      operationId: getModules
+      responses:
+        '200':
+          description: List of all modules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  modules:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Module'
+              example:
+                modules:
+                  - module_number: 1
+                    name: Basics
+                    topics:
+                      - Variables & Assignment
+                      - Data Types
+                      - Operators
+                    estimated_hours: 4
+                    progress_percentage: 75
+                    mastery_level: 68
+                  - module_number: 2
+                    name: Control Flow
+                    topics:
+                      - If Statements
+                      - For Loops
+                      - While Loops
+                    estimated_hours: 5
+                    progress_percentage: 40
+                    mastery_level: 45
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /modules/{module}/topics/{topic}:
+    get:
+      tags:
+        - Modules
+      summary: Get topic details with exercises
+      description: |
+        Returns detailed content for a specific topic including explanation,
+        code examples, and exercises.
+
+        **Requirements**: FR-009 (code editor interface)
+      operationId: getTopic
+      parameters:
+        - name: module
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 8
+          description: Module number (1-8)
+          example: 1
+        - name: topic
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Topic slug (e.g., "variables-assignment")
+          example: variables-assignment
+      responses:
+        '200':
+          description: Topic details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopicDetails'
+              example:
+                module_number: 1
+                module_name: Basics
+                topic_name: Variables & Assignment
+                explanation: "Variables store data values. Use the = operator to assign values..."
+                code_examples:
+                  - code: "name = 'Maya'\nage = 16"
+                    explanation: "Assigning string and integer values"
+                exercises:
+                  - id: ex_001
+                    question: "Create a variable called 'greeting' with the value 'Hello'"
+                    difficulty: beginner
+                    expected_output: "Hello"
+                    starter_code: "# Write your code here\n"
+                student_progress:
+                  exercises_completed: 2
+                  exercises_total: 5
+                  mastery_level: 60
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /submit:
+    post:
+      tags:
+        - Code Execution
+      summary: Submit exercise solution for grading
+      description: |
+        Submits student code for auto-grading with immediate feedback.
+        Code is executed in sandbox, compared against expected output, and analyzed for quality.
+
+        **Requirements**: FR-017 (submit solutions), FR-018 (grading feedback)
+      operationId: submitExercise
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitExerciseRequest'
+            example:
+              exercise_id: ex_001
+              code: "greeting = 'Hello'\nprint(greeting)"
+      responses:
+        '200':
+          description: Exercise graded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitExerciseResponse'
+              example:
+                submission_id: 550e8400-e29b-41d4-a716-446655440000
+                grade: 95
+                output: "Hello\n"
+                feedback: "Excellent work! Code is clean and follows best practices."
+                execution_time: 0.23
+                suggestions:
+                  - "Consider adding a docstring to explain your code"
+                passed: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /chat:
+    post:
+      tags:
+        - AI Tutor
+      summary: Send message to AI tutor
+      description: |
+        Routes student questions to the appropriate AI agent (Triage → Concepts, Debug,
+        Code Review, Exercise, or Progress). Returns response within 3 seconds or falls back.
+
+        **Requirements**: FR-014 (chat interface), FR-015 (agent routing), FR-016 (3-second response)
+      operationId: chatWithTutor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+            examples:
+              conceptQuestion:
+                summary: Concept explanation request
+                value:
+                  message: "How do variables work?"
+                  context:
+                    module: 1
+                    topic: "variables-assignment"
+              debugQuestion:
+                summary: Error debugging request
+                value:
+                  message: "I'm getting a NameError, what does it mean?"
+                  context:
+                    module: 1
+                    topic: "variables-assignment"
+                    last_error: "NameError: name 'x' is not defined"
+                    code: "print(x)"
+      responses:
+        '200':
+          description: AI tutor response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+              examples:
+                conceptResponse:
+                  summary: Concept explanation
+                  value:
+                    agent: concepts
+                    message: "Variables are containers for storing data values. Think of them like labeled boxes..."
+                    code_example: "name = 'Maya'  # String variable\nage = 16      # Integer variable"
+                    response_time: 2.1
+                    fallback: false
+                debugResponse:
+                  summary: Debug assistance
+                  value:
+                    agent: debug
+                    message: "A NameError means you're using a variable that hasn't been defined yet..."
+                    hints:
+                      - "Check if the variable name is spelled correctly"
+                      - "Make sure the variable is defined before you use it"
+                    response_time: 1.8
+                    fallback: false
+                fallbackResponse:
+                  summary: Fallback response (AI unavailable)
+                  value:
+                    agent: fallback
+                    message: "AI unavailable - showing general guidance: Variables must be defined before use..."
+                    response_time: 0.1
+                    fallback: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /progress:
+    get:
+      tags:
+        - Progress
+      summary: Get student progress dashboard
+      description: |
+        Returns comprehensive progress data including module completion, mastery levels,
+        streak, and recommended next topics.
+
+        **Requirements**: FR-019 (progress tracking), FR-020 (mastery calculation), FR-021 (mastery badges)
+      operationId: getProgress
+      responses:
+        '200':
+          description: Progress dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgressDashboard'
+              example:
+                overall_progress: 45
+                modules:
+                  - module_number: 1
+                    name: Basics
+                    completion_percentage: 80
+                    mastery_level: 71
+                    mastery_badge: proficient
+                    topics:
+                      - name: Variables & Assignment
+                        mastery_level: 75
+                        mastery_badge: proficient
+                        exercises_completed: 5
+                        last_quiz_score: 80
+                  - module_number: 2
+                    name: Control Flow
+                    completion_percentage: 40
+                    mastery_level: 45
+                    mastery_badge: learning
+                    topics:
+                      - name: If Statements
+                        mastery_level: 60
+                        mastery_badge: learning
+                        exercises_completed: 3
+                        last_quiz_score: 70
+                current_streak: 7
+                suggested_next_topics:
+                  - module: 2
+                    topic: For Loops
+                    reason: "Complete Control Flow module"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /quiz/take:
+    post:
+      tags:
+        - Quizzes
+      summary: Start a quiz for a topic
+      description: |
+        Generates and returns a quiz with 5-10 questions for the specified topic.
+
+        **Requirements**: FR-022 (auto-generated quizzes)
+      operationId: takeQuiz
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TakeQuizRequest'
+            example:
+              module: 1
+              topic: variables-assignment
+      responses:
+        '200':
+          description: Quiz questions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quiz'
+              example:
+                quiz_id: 550e8400-e29b-41d4-a716-446655440000
+                module: 1
+                topic: variables-assignment
+                questions:
+                  - question_id: q1
+                    question: "What is the correct way to assign the value 10 to variable x?"
+                    type: multiple_choice
+                    options:
+                      - "x = 10"
+                      - "x == 10"
+                      - "x := 10"
+                      - "var x = 10"
+                  - question_id: q2
+                    question: "Write code to create a variable 'message' with value 'Hello World'"
+                    type: code
+                    expected_output: "Hello World"
+                time_limit_minutes: 15
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /quiz/submit:
+    post:
+      tags:
+        - Quizzes
+      summary: Submit quiz answers for grading
+      description: |
+        Submits quiz answers and receives immediate grading with detailed feedback.
+
+        **Requirements**: FR-023 (quiz grading)
+      operationId: submitQuiz
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitQuizRequest'
+            example:
+              quiz_id: 550e8400-e29b-41d4-a716-446655440000
+              answers:
+                q1: "x = 10"
+                q2: "message = 'Hello World'\nprint(message)"
+      responses:
+        '200':
+          description: Quiz graded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuizResult'
+              example:
+                quiz_id: 550e8400-e29b-41d4-a716-446655440000
+                score: 80
+                correct_answers: 4
+                total_questions: 5
+                feedback:
+                  - question_id: q1
+                    correct: true
+                    feedback: "Correct! The = operator is used for assignment."
+                  - question_id: q2
+                    correct: false
+                    feedback: "The code is correct, but the expected output should be printed."
+                    correct_answer: "message = 'Hello World'"
+                new_mastery_level: 68
+                mastery_change: 8
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token with student role
+
+  schemas:
+    Module:
+      type: object
+      properties:
+        module_number:
+          type: integer
+          minimum: 1
+          maximum: 8
+          description: Module number in curriculum
+          example: 1
+        name:
+          type: string
+          description: Module name
+          example: Basics
+        topics:
+          type: array
+          items:
+            type: string
+          description: List of topic names in module
+          example: ["Variables & Assignment", "Data Types", "Operators"]
+        estimated_hours:
+          type: integer
+          description: Estimated completion time in hours
+          example: 4
+        progress_percentage:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Student's completion percentage
+          example: 75
+        mastery_level:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Student's mastery level (0-100%)
+          example: 68
+
+    TopicDetails:
+      type: object
+      properties:
+        module_number:
+          type: integer
+          minimum: 1
+          maximum: 8
+          example: 1
+        module_name:
+          type: string
+          example: Basics
+        topic_name:
+          type: string
+          example: Variables & Assignment
+        explanation:
+          type: string
+          description: Topic explanation text
+        code_examples:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              explanation:
+                type: string
+        exercises:
+          type: array
+          items:
+            $ref: '#/components/schemas/Exercise'
+        student_progress:
+          type: object
+          properties:
+            exercises_completed:
+              type: integer
+            exercises_total:
+              type: integer
+            mastery_level:
+              type: integer
+
+    Exercise:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique exercise identifier
+          example: ex_001
+        question:
+          type: string
+          description: Exercise question text
+        difficulty:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        expected_output:
+          type: string
+          description: Expected code output
+        starter_code:
+          type: string
+          description: Pre-populated starter code
+
+    SubmitExerciseRequest:
+      type: object
+      required:
+        - exercise_id
+        - code
+      properties:
+        exercise_id:
+          type: string
+          example: ex_001
+        code:
+          type: string
+          description: Student's code submission
+          example: "greeting = 'Hello'\nprint(greeting)"
+
+    SubmitExerciseResponse:
+      type: object
+      properties:
+        submission_id:
+          type: string
+          format: uuid
+          description: Unique submission identifier
+        grade:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Assigned grade (0-100)
+        output:
+          type: string
+          description: Code execution output
+        feedback:
+          type: string
+          description: Code review feedback
+        execution_time:
+          type: number
+          format: float
+          description: Execution time in seconds
+        suggestions:
+          type: array
+          items:
+            type: string
+          description: Improvement suggestions
+        passed:
+          type: boolean
+          description: Whether exercise passed all tests
+
+    ChatRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: Student's question
+          example: "How do variables work?"
+        context:
+          type: object
+          description: Additional context for AI agent
+          properties:
+            module:
+              type: integer
+            topic:
+              type: string
+            last_error:
+              type: string
+            code:
+              type: string
+
+    ChatResponse:
+      type: object
+      properties:
+        agent:
+          type: string
+          enum: [concepts, debug, code_review, exercise, progress, fallback]
+          description: AI agent that handled the request
+        message:
+          type: string
+          description: AI tutor response
+        code_example:
+          type: string
+          description: Optional code example
+        hints:
+          type: array
+          items:
+            type: string
+          description: Debugging hints (for debug agent)
+        response_time:
+          type: number
+          format: float
+          description: Response time in seconds
+        fallback:
+          type: boolean
+          description: Whether fallback response was used
+
+    ProgressDashboard:
+      type: object
+      properties:
+        overall_progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Overall completion percentage
+        modules:
+          type: array
+          items:
+            type: object
+            properties:
+              module_number:
+                type: integer
+              name:
+                type: string
+              completion_percentage:
+                type: integer
+              mastery_level:
+                type: integer
+              mastery_badge:
+                type: string
+                enum: [beginner, learning, proficient, mastered]
+              topics:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    mastery_level:
+                      type: integer
+                    mastery_badge:
+                      type: string
+                    exercises_completed:
+                      type: integer
+                    last_quiz_score:
+                      type: integer
+        current_streak:
+          type: integer
+          description: Consecutive days active
+        suggested_next_topics:
+          type: array
+          items:
+            type: object
+            properties:
+              module:
+                type: integer
+              topic:
+                type: string
+              reason:
+                type: string
+
+    TakeQuizRequest:
+      type: object
+      required:
+        - module
+        - topic
+      properties:
+        module:
+          type: integer
+          minimum: 1
+          maximum: 8
+        topic:
+          type: string
+
+    Quiz:
+      type: object
+      properties:
+        quiz_id:
+          type: string
+          format: uuid
+        module:
+          type: integer
+        topic:
+          type: string
+        questions:
+          type: array
+          items:
+            type: object
+            properties:
+              question_id:
+                type: string
+              question:
+                type: string
+              type:
+                type: string
+                enum: [multiple_choice, code, true_false]
+              options:
+                type: array
+                items:
+                  type: string
+              expected_output:
+                type: string
+        time_limit_minutes:
+          type: integer
+
+    SubmitQuizRequest:
+      type: object
+      required:
+        - quiz_id
+        - answers
+      properties:
+        quiz_id:
+          type: string
+          format: uuid
+        answers:
+          type: object
+          additionalProperties:
+            type: string
+          description: Map of question_id to answer
+
+    QuizResult:
+      type: object
+      properties:
+        quiz_id:
+          type: string
+          format: uuid
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        correct_answers:
+          type: integer
+        total_questions:
+          type: integer
+        feedback:
+          type: array
+          items:
+            type: object
+            properties:
+              question_id:
+                type: string
+              correct:
+                type: boolean
+              feedback:
+                type: string
+              correct_answer:
+                type: string
+        new_mastery_level:
+          type: integer
+        mastery_change:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: validation_error
+            message: Invalid module number
+
+    Unauthorized:
+      description: Authentication required or student role required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: unauthorized
+            message: Valid JWT token with student role required
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: not_found
+            message: Module or topic not found
+
+    ServiceUnavailable:
+      description: Code execution service unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: service_unavailable
+            message: Code execution service is temporarily unavailable
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: internal_error
+            message: An unexpected error occurred

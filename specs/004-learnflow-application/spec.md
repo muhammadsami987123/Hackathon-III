@@ -5,6 +5,18 @@
 **Status**: Draft
 **Input**: Complete AI-Powered Python Tutoring Platform with multi-agent architecture, Kubernetes deployment, and adaptive learning
 
+## Clarifications
+
+### Session 2025-12-22
+
+- Q: How should the system behave when AI agent calls fail or exceed the 3-second response target (FR-016)? → A: Fall back to pre-scripted common responses for the topic with disclaimer "AI unavailable - showing general guidance"
+- Q: What minimum observability signals must the platform emit for production readiness? → A: Core golden signals (request latency p50/p95/p99, error rate, throughput) plus business metrics (active students, AI response quality, mastery progression)
+- Q: How long should the system retain student code submissions, quiz responses, and struggle alerts? → A: During active classroom enrollment plus 1 year after enrollment ends (balances history with storage management)
+- Q: How should teachers receive struggle alert notifications? → A: In-app notification badge/panel updated in real-time when teacher is logged in, plus optional email digest (daily summary)
+- Q: What states can a classroom have, and how do students/teachers interact with ended classrooms? → A: Active and Archived states - teachers can archive classrooms (read-only for review, no new enrollments/submissions)
+
+---
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Student Learning Python Basics (Priority: P1)
@@ -52,8 +64,8 @@ Mr. Rodriguez, a teacher with 24 students in "Intro to Python", wants to monitor
 
 **Acceptance Scenarios**:
 
-1. **Given** Mr. Rodriguez logs in as a teacher, **When** he navigates to "Intro to Python" class dashboard, **Then** he sees: student count (24), active today count, average progress per module, and list of struggling students
-2. **Given** three students (James, Sarah, Miguel) are struggling, **When** Mr. Rodriguez views the alerts section, **Then** he sees specific triggers: "James stuck on list_indexing >10 min", "Sarah: same NameError 3x", "Miguel: quiz score 45%"
+1. **Given** Mr. Rodriguez logs in as a teacher, **When** he navigates to "Intro to Python" class dashboard, **Then** he sees: student count (24), active today count, average progress per module, list of struggling students, and notification badge showing unread alert count
+2. **Given** three students (James, Sarah, Miguel) are struggling, **When** Mr. Rodriguez clicks the notification badge, **Then** a dropdown panel displays recent alerts with specific triggers: "James stuck on list_indexing >10 min", "Sarah: same NameError 3x", "Miguel: quiz score 45%"
 3. **Given** Mr. Rodriguez clicks on James's alert, **When** the detail view loads, **Then** he sees James's code attempts, time spent, and error patterns
 4. **Given** Mr. Rodriguez wants to help James, **When** he clicks "Generate Remedial Exercises", **Then** the Exercise Agent creates 3-5 beginner-level exercises on list indexing
 5. **Given** Mr. Rodriguez assigns exercises to James, **When** he sets a deadline and clicks "Assign", **Then** James receives a notification and the exercises appear in his dashboard
@@ -123,6 +135,8 @@ Mr. Rodriguez wants to create custom exercises for students who need extra pract
 - **Quiz Retakes**: What happens when a student retakes the same quiz multiple times? System should track all attempts and use the highest score for mastery calculation.
 - **Simultaneous Teacher Access**: What happens when multiple teachers view/edit the same student's progress? System must handle concurrent access gracefully with optimistic locking or last-write-wins strategy.
 - **Code Review False Positives**: What happens when the Code Review Agent incorrectly flags valid code? Students should be able to flag feedback as incorrect, triggering human review.
+- **AI Agent Unavailable**: What happens when OpenAI API is down or responses exceed 3-second timeout? System must fall back to pre-scripted responses for the topic with disclaimer "AI unavailable - showing general guidance" to maintain learning continuity.
+- **Archived Classroom Access Attempt**: What happens when a student tries to submit code or take a quiz in an archived classroom? System must display message "This classroom is archived and no longer accepts new submissions. You can view your past work in read-only mode."
 
 ## Requirements *(mandatory)*
 
@@ -157,10 +171,15 @@ Mr. Rodriguez wants to create custom exercises for students who need extra pract
 
 #### Teacher Monitoring Features
 - **FR-024**: System MUST allow teachers to create classrooms with unique join codes
-- **FR-025**: System MUST allow students to join classrooms using join codes
+- **FR-024a**: System MUST support classroom states: Active (default) and Archived
+- **FR-024b**: System MUST allow teachers to archive classrooms, transitioning them to read-only mode (no new enrollments, submissions, or progress updates)
+- **FR-024c**: System MUST allow teachers and enrolled students to view archived classroom data (past submissions, grades, progress) but prevent new activity
+- **FR-025**: System MUST allow students to join Active classrooms using join codes (cannot join Archived classrooms)
 - **FR-026**: System MUST display class dashboard showing: student count, active students today, struggling students, and average progress per module
 - **FR-027**: System MUST generate struggle alerts when: same error 3+ times, stuck >10 minutes, quiz score <50%, "I don't understand" 3+ times, or 5+ consecutive execution failures
-- **FR-028**: System MUST notify teachers in real-time when struggle alerts are triggered
+- **FR-028**: System MUST notify teachers of struggle alerts via in-app notification badge/panel updated in real-time when logged in
+- **FR-028a**: System MUST provide optional email digest feature sending daily summary of struggle alerts to teachers who enable it
+- **FR-028b**: System MUST display notification count badge on teacher dashboard header with dropdown panel showing recent alerts
 - **FR-029**: System MUST allow teachers to view individual student dashboards with code submissions and error patterns
 - **FR-030**: System MUST allow teachers to generate custom exercises using the Exercise Agent
 - **FR-031**: System MUST allow teachers to assign exercises to specific students with deadlines
@@ -174,15 +193,19 @@ Mr. Rodriguez wants to create custom exercises for students who need extra pract
 - **FR-037**: System MUST implement Debug Agent to diagnose errors and provide hints without giving solutions
 - **FR-038**: System MUST implement Exercise Agent to generate practice problems based on topic and difficulty
 - **FR-039**: System MUST implement Progress Agent to track learning metrics and provide progress reports
+- **FR-039a**: System MUST fall back to pre-scripted topic-specific responses when AI agents fail or exceed 3-second timeout, displaying disclaimer "AI unavailable - showing general guidance"
 
 #### Data Persistence
 - **FR-040**: System MUST persist user accounts (id, email, name, password_hash, role, created_at, updated_at)
-- **FR-041**: System MUST persist classrooms (id, name, teacher_id, join_code, created_at, updated_at)
+- **FR-041**: System MUST persist classrooms (id, name, teacher_id, join_code, status, created_at, archived_at, updated_at)
 - **FR-042**: System MUST persist student progress (student_id, module, topic, mastery_level, exercises_completed, quizzes_taken, last_quiz_score)
 - **FR-043**: System MUST persist code submissions (student_id, exercise_id, code_text, output, grade, feedback, submitted_at, execution_time)
 - **FR-044**: System MUST persist quiz responses (student_id, quiz_id, score, answers, completed_at)
 - **FR-045**: System MUST persist struggle alerts (student_id, classroom_id, trigger_type, description, resolved, created_at, resolved_at)
 - **FR-046**: System MUST auto-save student code in editor every 30 seconds to prevent data loss
+- **FR-046a**: System MUST retain code submissions, quiz responses, and struggle alerts during active classroom enrollment plus 1 year after enrollment ends
+- **FR-046b**: System MUST permanently delete expired data (code submissions, quiz responses, struggle alerts older than retention period) via automated cleanup job
+- **FR-046c**: System MUST retain student progress records (mastery levels, completion status) indefinitely for historical academic records
 
 #### Event-Driven Architecture
 - **FR-047**: System MUST publish `code.executed` events to Kafka when code runs successfully
@@ -199,11 +222,19 @@ Mr. Rodriguez wants to create custom exercises for students who need extra pract
 - **FR-056**: System MUST implement API gateway (Kong or Nginx) for load balancing, authentication, and rate limiting
 - **FR-057**: System MUST support deployment to Minikube for local development (4 CPU, 8GB RAM minimum)
 
+#### Observability & Monitoring
+- **FR-058**: System MUST emit request latency metrics (p50, p95, p99) for all API endpoints
+- **FR-059**: System MUST track and expose error rate percentage per service
+- **FR-060**: System MUST measure and report throughput (requests per second) per endpoint
+- **FR-061**: System MUST track business metrics: active students (daily/weekly), AI agent usage count, average mastery progression rate
+- **FR-062**: System MUST log all errors with structured context (timestamp, user_id, service, error_type, stack_trace)
+- **FR-063**: System MUST provide health check endpoints for each service returning status and dependency health
+
 ### Key Entities
 
 - **User**: Represents a person using the platform. Attributes: unique ID, email address, name, hashed password, role (student or teacher), account creation date, last updated date. Relationships: Students belong to classrooms; teachers own classrooms.
 
-- **Classroom**: Represents a group of students taught by one teacher. Attributes: unique ID, name (e.g., "Intro to Python Section A"), teacher reference, unique join code for enrollment, creation date. Relationships: One teacher, many students via enrollments.
+- **Classroom**: Represents a group of students taught by one teacher. Attributes: unique ID, name (e.g., "Intro to Python Section A"), teacher reference, unique join code for enrollment, status (Active or Archived), creation date, archived date (nullable). Relationships: One teacher, many students via enrollments. Lifecycle: Created as Active, can be archived by teacher to read-only mode.
 
 - **Student Progress**: Represents learning advancement for one student in one topic. Attributes: student reference, module number (1-8), topic name, mastery percentage (0-100), count of exercises completed, count of quizzes taken, most recent quiz score. Relationships: Belongs to one student, references one topic.
 
@@ -276,6 +307,7 @@ Mr. Rodriguez wants to create custom exercises for students who need extra pract
 13. **Infrastructure**: Local development on Minikube; cloud deployment strategy (AWS/GCP/Azure) is defined in implementation plan, not spec
 14. **Data Privacy**: Assumes compliance with general data protection practices; specific GDPR/FERPA compliance is implementation concern
 15. **Student Collaboration**: MVP is single-player; pair programming or collaborative features are out of scope
+16. **Data Retention**: Code submissions, quiz responses, and struggle alerts retained during active enrollment plus 1 year; progress records (mastery levels) retained indefinitely for academic records
 
 ## Open Questions *(optional - maximum 3)*
 
@@ -348,7 +380,7 @@ Mr. Rodriguez wants to create custom exercises for students who need extra pract
 
 4. **Testing Strategy**: UI tests, API tests, sandbox security tests, AI agent response accuracy tests, load tests for 100 concurrent users.
 
-5. **Monitoring**: Implement logging (structured JSON logs), metrics (Prometheus), tracing (Jaeger), and alerting (PagerDuty/Opsgenie) for production readiness.
+5. **Monitoring**: Implement Prometheus for metrics collection (golden signals: latency p50/p95/p99, error rate, throughput; business metrics: active students, AI usage, mastery progression), Grafana for dashboards, structured JSON logging for errors, and health check endpoints for each service.
 
 6. **Data Migration**: Plan for schema evolution as new features are added. Use database migration tools (Alembic for Python).
 

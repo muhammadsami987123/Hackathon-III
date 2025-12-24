@@ -45,7 +45,12 @@
       "Bash(helm version:*)",
       "Bash(claude:*)",
       "Bash(goose:*)",
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Bash({ git ls-remote --heads origin)",
+      "Bash(})",
+      "Bash(python:*)",
+      "Bash(minikube status:*)",
+      "Bash(git -C \"F:/Hackathon/Hackathon III\" branch --show-current)"
     ]
   }
 }
